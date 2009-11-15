@@ -92,61 +92,20 @@ func (mysql *MySQLInstance) readResult() os.Error {
 	fmt.Printf("Result == %x\n", result);
 	return nil;
 }
-func (mysql *MySQLInstance) command(c byte)	{}
 
-//Connects to mysql server and reads the initial handshake,
-//then tries to login using supplied credentials.
-func Connect(host string, username string, password string, database string) (*MySQLInstance, os.Error) {
-	var err os.Error;
-	mysql := new(MySQLInstance);
-	mysql.username = username;
-	mysql.password = password;
-	mysql.database = database;
-	mysql.connection, err = net.Dial("tcp", "", host);
-	if err != nil {
-		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", host))
-	}
-	mysql.reader = bufio.NewReader(mysql.connection);
-	mysql.writer = bufio.NewWriter(mysql.connection);
-	if err = mysql.readInit(); err != nil {
-		return nil, err
-	}
-	err = mysql.sendAuth();
-	if err = mysql.readResult(); err != nil {
-		return nil, err
-	}
-	mysql.Connected = true;
-	fmt.Printf("Connected to server\n");
-	return mysql, nil;
+func (mysql *MySQLInstance) command(command MySQLCommand, arg string) os.Error	{
+	plen := len(arg) + 1;
+        var head [5]byte;
+        head[0] = byte(plen);
+        head[1] = byte(plen >> 8);
+        head[2] = byte(plen >> 16);
+        head[3] = 0;
+	head[4] = uint8(command);
+	_, err := mysql.writer.Write(&head);
+	err = mysql.writer.WriteString(arg);
+	err = mysql.writer.Flush();
+	return err;
 }
-
-//This is really ugly.
-func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
-	ctx := sha1.New();
-	ctx.Write(password);
-	stage1 := ctx.Sum();
-
-	ctx = sha1.New();
-	ctx.Write(stage1);
-	stage2 := ctx.Sum();
-
-	ctx = sha1.New();
-	ctx.Write(scrambleBuffer);
-	ctx.Write(stage2);
-	result := ctx.Sum();
-
-	token := new([21]byte);
-	token_t := new([20]byte);
-	for i := 0; i < 20; i++ {
-		token[i+1] = result[i] ^ stage1[i]
-	}
-	for i := 0; i < 20; i++ {
-		token_t[i] = token[i+1] ^ result[i]
-	}
-	token[0] = 20;
-	return token;
-}
-
 // Try to auth using the MySQL secure auth *crossing fingers*
 func (mysql *MySQLInstance) sendAuth() os.Error {
 	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION;
@@ -181,3 +140,63 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	return nil;
 
 }
+
+func (mysql *MySQLInstance) Query(arg string) os.Error {
+	err := mysql.command(COM_QUERY, arg);
+	return err;
+}
+
+//Connects to mysql server and reads the initial handshake,
+//then tries to login using supplied credentials.
+func Connect(host string, username string, password string, database string) (*MySQLInstance, os.Error) {
+	var err os.Error;
+	mysql := new(MySQLInstance);
+	mysql.username = username;
+	mysql.password = password;
+	mysql.database = database;
+	mysql.connection, err = net.Dial("tcp", "", host);
+	if err != nil {
+		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", host))
+	}
+	mysql.reader = bufio.NewReader(mysql.connection);
+	mysql.writer = bufio.NewWriter(mysql.connection);
+	if err = mysql.readInit(); err != nil {
+		return nil, err
+	}
+	err = mysql.sendAuth();
+	if err = mysql.readResult(); err != nil {
+		return nil, err
+	}
+	mysql.Connected = true;
+	fmt.Printf("Connected to server\n");
+	return mysql, nil;
+}
+
+
+//This is really ugly.
+func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
+	ctx := sha1.New();
+	ctx.Write(password);
+	stage1 := ctx.Sum();
+
+	ctx = sha1.New();
+	ctx.Write(stage1);
+	stage2 := ctx.Sum();
+
+	ctx = sha1.New();
+	ctx.Write(scrambleBuffer);
+	ctx.Write(stage2);
+	result := ctx.Sum();
+
+	token := new([21]byte);
+	token_t := new([20]byte);
+	for i := 0; i < 20; i++ {
+		token[i+1] = result[i] ^ stage1[i]
+	}
+	for i := 0; i < 20; i++ {
+		token_t[i] = token[i+1] ^ result[i]
+	}
+	token[0] = 20;
+	return token;
+}
+

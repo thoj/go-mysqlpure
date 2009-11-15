@@ -12,4 +12,8 @@ func main() {
 		fmt.Printf("%s\n", err);
 	}
 	fmt.Printf("Connected to %s\n", dbh.ServerVersion);
+	err = dbh.Query("SHOW PROCESSLIST");
+	if err != nil {
+		fmt.Printf("%s\n", err);
+	}
 }
