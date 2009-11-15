@@ -1,4 +1,4 @@
-GOFILES = mysql.go mysql_const.go
+GOFILES = mysql.go mysql_const.go mysql_util.go
 
 all: $(GOARCH)
 
