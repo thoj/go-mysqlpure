@@ -4,7 +4,7 @@ clean:
 	rm *.8 test
 
 386:	
-	8g mysql.go 
+	8g mysql.go mysql_const.go 
 	8g test.go
 	8l -o test test.8
 
