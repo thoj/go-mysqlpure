@@ -1,4 +1,10 @@
-package main
+// Copyright 2009 Thomas Jager <mail@jager.no>  All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// MySQL 4.1+ Client Library.
+
+package mysql
 
 
 import (
@@ -12,6 +18,8 @@ import (
 	"strings";
 )
 
+
+// Constants
 const (
 	CLIENT_LONG_PASSWORD		= 1;		/* new more secure passwords */
 	CLIENT_FOUND_ROWS		= 2;		/* Found instead of affected rows */
@@ -33,6 +41,7 @@ const (
 	CLIENT_MULTI_RESULTS		= 131072;	/* Enable/disable multi-results */
 )
 
+//Common Header
 type PacketHeaderR struct {
 	Len1	uint8;
 	Len2	uint8;
@@ -40,66 +49,78 @@ type PacketHeaderR struct {
 	Seq	uint8;
 }
 
-
-var ProtocolVersion uint8
-var ServerVersion string
-var ThreadId uint32
+var ProtocolVersion uint8 // Protocol version = 0x10
+var ServerVersion string  // Server string
+var ThreadId uint32	  // Current Thread ID
 var ServerCapabilities uint16
 var ServerLanguage uint8
 var ServerStatus uint16
+
+var Connected = false;
 
 
 var scrambleBuffer []byte
 
 //Read initial handshake packet.
-func readInitPacket(br *bufio.Reader) os.Error {
-	_ = binary.Read(br, binary.LittleEndian, &ProtocolVersion);
+func readInit(br *bufio.Reader) os.Error {
+	var ph PacketHeaderR;
+	binary.Read(br, binary.LittleEndian, &ph); //Header (Length and Seqence number)
+	if ph.Seq != 0 {
+		// Initial packet must be Seq == 0
+		return os.ErrorString("Unexpected Sequence Number");
+	}
+	binary.Read(br, binary.LittleEndian, &ProtocolVersion);
 	ServerVersion, _ = br.ReadString('\x00');
-	_ = binary.Read(br, binary.LittleEndian, &ThreadId);
+	binary.Read(br, binary.LittleEndian, &ThreadId);
 	var sb [9]byte;
-	_, _ = br.Read(&sb);
-	_ = binary.Read(br, binary.LittleEndian, &ServerCapabilities);
-	_ = binary.Read(br, binary.LittleEndian, &ServerLanguage);
-	_ = binary.Read(br, binary.LittleEndian, &ServerStatus);
+	br.Read(&sb);
+	binary.Read(br, binary.LittleEndian, &ServerCapabilities);
+	binary.Read(br, binary.LittleEndian, &ServerLanguage);
+	binary.Read(br, binary.LittleEndian, &ServerStatus);
 	var sb2 [26]byte;
-	_, _ = br.Read(&sb2);
+	br.Read(&sb2);
 	scrambleBuffer = new([20]byte);
-	_ = bytes.Copy(scrambleBuffer[0:8], sb[0:8]);
-	_ = bytes.Copy(scrambleBuffer[8:20], sb2[13:25]);
+	bytes.Copy(scrambleBuffer[0:8], sb[0:8]);
+	bytes.Copy(scrambleBuffer[8:20], sb2[13:25]);
 	return nil;
 }
 
-//Tries to read incoming packet
-func readPacket(br *bufio.Reader) os.Error {
+//Tries to read OK result error on error packett
+func readResult(br *bufio.Reader) os.Error {
 	var ph PacketHeaderR;
-
-	e := binary.Read(br, binary.LittleEndian, &ph);
-	if ph.Seq == 0 {
-		readInitPacket(br)
+	binary.Read(br, binary.LittleEndian, &ph); 
+	var result byte;
+	binary.Read(br, binary.LittleEndian, &result);
+	if result == 0xff {
+		var errcode uint16;
+		binary.Read(br, binary.LittleEndian, &errcode);
+		status := make ([]byte, 6 );
+		br.Read(status);
+		msg, _ := br.ReadString(0x00);
+		return os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), msg));
 	}
-	if e != nil {
-		fmt.Printf("%s\n", e);
-		os.Exit(1);
-	}
+	fmt.Printf("Result == %x\n", result );
 	return nil;
 }
 
 //Connects to mysql server and reads the initial handshake, 
 //then tries to login using supplied credentials.
-func Connect(host string, database string, username string, password string) os.Error {
+func Connect(host string, username string, password string, database string) os.Error {
 	conn, err := net.Dial("tcp", "", host);
 	if err != nil {
 		return os.ErrorString(fmt.Sprintf("Cant connect to %s\n", host))
 	}
 	br := bufio.NewReader(conn);
 	bw := bufio.NewWriter(conn);
-	if err = readPacket(br); err != nil {
+	if err = readInit(br); err != nil {
 		return err
 	}
-	sendAuth(bw, database, username, password);
-	if err = readPacket(br); err != nil {
+	err = sendAuth(bw, database, username, password);
+	if err = readResult(br); err != nil {
 		return err
 	}
+	Connected = true;
+	fmt.Printf("Connected to server\n");
 	return nil;
 }
 
@@ -130,6 +151,7 @@ func mysqlPassword(password []byte) []byte {
 	return token;
 }
 
+// Try to auth using the MySQL secure auth *crossing fingers*
 func sendAuth(bw *bufio.Writer, database string, username string, password string) os.Error {
 	var clientattr uint32 = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION;
 	var len int = len(username) + len(database) + 55;
@@ -141,24 +163,19 @@ func sendAuth(bw *bufio.Writer, database string, username string, password strin
 	binary.LittleEndian.PutUint32(head[4:8], clientattr);
 	binary.LittleEndian.PutUint32(head[8:12], uint32(1073741824));
 	head[12] = ServerLanguage;
-	_, _ = bw.Write(&head);
-	fmt.Printf("%v\n", head);
+	bw.Write(&head);
 	var filler [23]byte;
-	_, _ = bw.Write(&filler);
-	_ = bw.WriteString(username);
-	_, _ = bw.Write(filler[0:1]);
+	bw.Write(&filler);
+	bw.WriteString(username);
+	bw.Write(filler[0:1]);
 	token := mysqlPassword(strings.Bytes(password));
-	_, _ = bw.Write(token);
-	_ = bw.WriteString(database);
-	_, _ = bw.Write(filler[0:1]);
+	bw.Write(token);
+	bw.WriteString(database);
+	bw.Write(filler[0:1]);
 	bw.Flush();
 
 	return nil;
 
 }
 
-func main() {
-	_ = Connect("127.0.0.1:3306", "pre", "root", "omega51");
-	fmt.Printf("Protocol = %d, Version = %s, Thread = %d, Capabilities = %d, Language = %d, Status = %d\n", ProtocolVersion, ServerVersion, ThreadId, ServerCapabilities, ServerLanguage, ServerStatus);
-}
 	
