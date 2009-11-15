@@ -26,6 +26,15 @@ type PacketHeaderR struct {
 	Seq	uint8;
 }
 
+type MySQLResponse struct {
+	FieldCount	uint8;
+	AffectedRows	uint64;
+	InsertId	uint64;
+	ServerStatus	uint16;
+	WarningCount	uint16;
+	Message		[]string;
+}
+
 type MySQLInstance struct {
 	ProtocolVersion		uint8;	// Protocol version = 0x10
 	ServerVersion		string;	// Server string
@@ -72,39 +81,52 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	return nil;
 }
 
+
 //Tries to read OK result error on error packett
-func (mysql *MySQLInstance) readResult() os.Error {
+func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	var ph PacketHeaderR;
+	response := new(MySQLResponse);
 	err := binary.Read(mysql.reader, binary.LittleEndian, &ph);
-	var result byte;
-	err = binary.Read(mysql.reader, binary.LittleEndian, &result);
-	if result == 0xff {
+	err = binary.Read(mysql.reader, binary.LittleEndian, &response.FieldCount);
+	if response.FieldCount == 0xff {	// ERROR
 		var errcode uint16;
 		binary.Read(mysql.reader, binary.LittleEndian, &errcode);
 		status := make([]byte, 6);
 		mysql.reader.Read(status);
 		msg, _ := mysql.reader.ReadString(0x00);
-		return os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), msg));
+		return nil, os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), msg));
+	} else if response.FieldCount == 0x00 {	// OK
+		bl, bin := readLengthCodedBinary(mysql.reader);
+		response.AffectedRows = byteToUIntLE(bin, bl);
+		bl, bin = readLengthCodedBinary(mysql.reader);
+		response.InsertId = byteToUIntLE(bin, bl);
+		err = binary.Read(mysql.reader, binary.LittleEndian, &response.ServerStatus);
+		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount);
+
+		fmt.Printf("%#v [%d]\n", bin, bl);
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	fmt.Printf("Result == %x\n", result);
-	return nil;
+	return response, nil;
 }
 
-func (mysql *MySQLInstance) command(command MySQLCommand, arg string) os.Error	{
+func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLResponse, os.Error) {
 	plen := len(arg) + 1;
-        var head [5]byte;
-        head[0] = byte(plen);
-        head[1] = byte(plen >> 8);
-        head[2] = byte(plen >> 16);
-        head[3] = 0;
+	var head [5]byte;
+	head[0] = byte(plen);
+	head[1] = byte(plen >> 8);
+	head[2] = byte(plen >> 16);
+	head[3] = 0;
 	head[4] = uint8(command);
 	_, err := mysql.writer.Write(&head);
 	err = mysql.writer.WriteString(arg);
 	err = mysql.writer.Flush();
-	return err;
+	if err != nil {
+		return nil, err
+	}
+
+	return mysql.readResult();
 }
 // Try to auth using the MySQL secure auth *crossing fingers*
 func (mysql *MySQLInstance) sendAuth() os.Error {
@@ -141,9 +163,10 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 
 }
 
-func (mysql *MySQLInstance) Query(arg string) os.Error {
-	err := mysql.command(COM_QUERY, arg);
-	return err;
+func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
+	response := new(MySQLResponse);
+	response, err := mysql.command(COM_QUERY, arg);
+	return response, err;
 }
 
 //Connects to mysql server and reads the initial handshake,
@@ -164,9 +187,11 @@ func Connect(host string, username string, password string, database string) (*M
 		return nil, err
 	}
 	err = mysql.sendAuth();
-	if err = mysql.readResult(); err != nil {
+	var response *MySQLResponse;
+	if response, err = mysql.readResult(); err != nil {
 		return nil, err
 	}
+	fmt.Printf("%#v", response);
 	mysql.Connected = true;
 	fmt.Printf("Connected to server\n");
 	return mysql, nil;
@@ -199,4 +224,3 @@ func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 	token[0] = 20;
 	return token;
 }
-
