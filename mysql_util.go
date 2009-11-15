@@ -5,6 +5,7 @@ import (
 	"bufio";
 )
 
+
 type EncodedBinary struct {
 	Length	uint8;
 	IsNull	bool;
@@ -24,6 +25,13 @@ func readHeader(br *bufio.Reader) *PacketHeader {
 	ph.Len = byteToUInt64LE(&i24seq, 3);
 	ph.Seq = i24seq[3];
 	return ph;
+}
+func readLengthCodedString(br *bufio.Reader) string {
+	var bl uint8;
+	binary.Read(br, binary.LittleEndian, &bl);
+	b := make([]byte,bl);
+	br.Read(b);
+	return string(b);	
 }
 
 // Read Length Encoded Binary

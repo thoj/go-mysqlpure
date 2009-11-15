@@ -18,6 +18,27 @@ import (
 	"strings";
 )
 
+type MySQLField struct {
+	Catalog		string;
+	Db		string;
+	Table		string;
+	OrgTable	string;
+	Name		string;
+	OrgName		string;
+
+	Charset		uint16;
+	Length		uint32;
+	Type		uint8;
+	Flags		uint16;
+	Decimals	uint8;
+	Default		uint64;
+}
+
+
+type MySQLResultSet struct {
+	FieldCount	uint64;
+	Fields		[]*MySQLField;
+}
 
 type MySQLResponse struct {
 	FieldCount	uint8;
@@ -26,6 +47,8 @@ type MySQLResponse struct {
 	ServerStatus	uint16;
 	WarningCount	uint16;
 	Message		[]string;
+
+	ResultSet	*MySQLResultSet;
 }
 
 type MySQLInstance struct {
@@ -74,6 +97,42 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	return nil;
 }
 
+func readFieldPacket(br *bufio.Reader) *MySQLField {
+	f := new(MySQLField);
+	f.Catalog = readLengthCodedString(br);
+	f.Db = readLengthCodedString(br);
+	f.Table = readLengthCodedString(br);
+	f.OrgTable = readLengthCodedString(br);
+	f.Name = readLengthCodedString(br);
+	f.OrgName = readLengthCodedString(br);
+	var filler [2]byte;
+	br.Read(filler[0:1]);
+	fmt.Printf("%v\n", filler[0:1]);
+	binary.Read(br, binary.LittleEndian, &f.Charset);
+	binary.Read(br, binary.LittleEndian, &f.Length);
+	binary.Read(br, binary.LittleEndian, &f.Type);
+	binary.Read(br, binary.LittleEndian, &f.Flags);
+	binary.Read(br, binary.LittleEndian, &f.Decimals);
+	br.Read(filler[0:1]);
+	eb := readLengthCodedBinary(br);
+	f.Default = eb.Value;
+	fmt.Printf("%#v\n", f);
+	return f;
+}
+
+func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, os.Error) {
+	rs := new(MySQLResultSet);
+	rs.FieldCount = fieldCount;
+	fmt.Printf("Columns = %d\n", rs.FieldCount);
+	rs.Fields = make([]*MySQLField, rs.FieldCount);
+	var i uint64;
+	for i = 0; i < rs.FieldCount; i++ {
+		ph := readHeader(mysql.reader);
+		fmt.Printf("Len = %d, Seq = %d\n", ph.Len, ph.Seq);
+		rs.Fields[i] = readFieldPacket(mysql.reader);
+	}
+	return nil, nil;
+}
 
 //Tries to read OK result error on error packett
 func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
@@ -101,7 +160,10 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount);
 
 	} else if response.FieldCount > 0x00 && response.FieldCount < 0xFB {	//Result|Field|Row Data
-		return nil, err
+		fmt.Printf("Field Count = %d\n", response.FieldCount);
+		rs, _ := mysql.readResultSet(uint64(response.FieldCount));
+		response.ResultSet = rs;
+		return response, err;
 	} else if response.FieldCount == 0xFE {	// EOF
 		return nil, err
 	}
