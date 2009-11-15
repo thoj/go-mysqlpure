@@ -16,6 +16,7 @@ func main() {
 	fmt.Printf("Connected to %s\n", dbh.ServerVersion);
 	var res * mysql.MySQLResponse;
 	res, err = dbh.Query("SHOW PROCESSLIST");
+	res, err = dbh.Query("SELECT * FROM test");
 	if err != nil {
 		fmt.Printf("%s\n", err);
 		os.Exit(1);
