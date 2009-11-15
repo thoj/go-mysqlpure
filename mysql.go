@@ -37,14 +37,14 @@ type MySQLInstance struct {
 	Connected	bool;
 
 	scrambleBuffer	[]byte;
-	
-	reader *bufio.Reader;
-	writer *bufio.Writer;
-	connection net.Conn;
 
-	database string;
-	username string;
-	password string;
+	reader		*bufio.Reader;
+	writer		*bufio.Writer;
+	connection	net.Conn;
+
+	database	string;
+	username	string;
+	password	string;
 }
 
 
@@ -92,6 +92,7 @@ func (mysql *MySQLInstance) readResult() os.Error {
 	fmt.Printf("Result == %x\n", result);
 	return nil;
 }
+func (mysql *MySQLInstance) command(c byte)	{}
 
 //Connects to mysql server and reads the initial handshake,
 //then tries to login using supplied credentials.
@@ -148,10 +149,10 @@ func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 
 // Try to auth using the MySQL secure auth *crossing fingers*
 func (mysql *MySQLInstance) sendAuth() os.Error {
-	var clientattr uint32 = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION;
+	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION;
 	var plen int = len(mysql.username);
 	if len(mysql.database) > 0 {
-		clientattr += CLIENT_CONNECT_WITH_DB;
+		clientFlags += CLIENT_CONNECT_WITH_DB;
 		plen += len(mysql.database) + 55;
 	} else {
 		plen += 54
@@ -161,10 +162,10 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	head[1] = byte(plen >> 8);
 	head[2] = byte(plen >> 16);
 	head[3] = 1;
-	binary.LittleEndian.PutUint32(head[4:8], clientattr);
+	binary.LittleEndian.PutUint32(head[4:8], uint32(clientFlags));
 	binary.LittleEndian.PutUint32(head[8:12], uint32(1073741824));
 	head[12] = mysql.ServerLanguage;
- 	mysql.writer.Write(&head);
+	mysql.writer.Write(&head);
 	var filler [23]byte;
 	mysql.writer.Write(&filler);
 	mysql.writer.WriteString(mysql.username);
