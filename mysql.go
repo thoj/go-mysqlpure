@@ -18,13 +18,6 @@ import (
 	"strings";
 )
 
-//Common Header
-type PacketHeaderR struct {
-	Len1	uint8;
-	Len2	uint8;
-	Len3	uint8;
-	Seq	uint8;
-}
 
 type MySQLResponse struct {
 	FieldCount	uint8;
@@ -59,8 +52,8 @@ type MySQLInstance struct {
 
 //Read initial handshake packet.
 func (mysql *MySQLInstance) readInit() os.Error {
-	var ph PacketHeaderR;
-	binary.Read(mysql.reader, binary.LittleEndian, &ph);	//Header (Length and Seqence number)
+	ph := readHeader(mysql.reader);
+
 	if ph.Seq != 0 {
 		// Initial packet must be Seq == 0
 		return os.ErrorString("Unexpected Sequence Number")
@@ -84,10 +77,13 @@ func (mysql *MySQLInstance) readInit() os.Error {
 
 //Tries to read OK result error on error packett
 func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
-	var ph PacketHeaderR;
+	ph := readHeader(mysql.reader);
 	response := new(MySQLResponse);
-	err := binary.Read(mysql.reader, binary.LittleEndian, &ph);
-	err = binary.Read(mysql.reader, binary.LittleEndian, &response.FieldCount);
+	if ph.Len < 1 {
+		return nil, os.ErrorString("Packet to small")
+	}
+
+	err := binary.Read(mysql.reader, binary.LittleEndian, &response.FieldCount);
 	if response.FieldCount == 0xff {	// ERROR
 		var errcode uint16;
 		binary.Read(mysql.reader, binary.LittleEndian, &errcode);
@@ -95,15 +91,19 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		mysql.reader.Read(status);
 		msg, _ := mysql.reader.ReadString(0x00);
 		return nil, os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), msg));
+
 	} else if response.FieldCount == 0x00 {	// OK
-		bl, bin := readLengthCodedBinary(mysql.reader);
-		response.AffectedRows = byteToUIntLE(bin, bl);
-		bl, bin = readLengthCodedBinary(mysql.reader);
-		response.InsertId = byteToUIntLE(bin, bl);
+		eb := readLengthCodedBinary(mysql.reader);
+		response.AffectedRows = eb.Value;
+		eb = readLengthCodedBinary(mysql.reader);
+		response.InsertId = eb.Value;
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.ServerStatus);
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount);
 
-		fmt.Printf("%#v [%d]\n", bin, bl);
+	} else if response.FieldCount > 0x00 && response.FieldCount < 0xFB {	//Result|Field|Row Data
+		return nil, err
+	} else if response.FieldCount == 0xFE {	// EOF
+		return nil, err
 	}
 	if err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func Connect(host string, username string, password string, database string) (*M
 	if response, err = mysql.readResult(); err != nil {
 		return nil, err
 	}
-	fmt.Printf("%#v", response);
+	fmt.Printf("Response: %#v\n", response);
 	mysql.Connected = true;
 	fmt.Printf("Connected to server\n");
 	return mysql, nil;
