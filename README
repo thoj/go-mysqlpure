@@ -1,0 +1,9 @@
+GOAL:
+The goal of this project is to implemnt the MySQL wire protocol in Go 
+and create a usable client library for other Go projects.
+
+The wire protocol is documented here: 
+ http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol
+
+STATUS:
+Only Auth implented currently.
