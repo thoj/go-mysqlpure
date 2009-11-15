@@ -120,6 +120,20 @@ func readFieldPacket(br *bufio.Reader) *MySQLField {
 	return f;
 }
 
+func readEOFPacket(br *bufio.Reader) os.Error {
+	readHeader(br);
+		
+	response := new(MySQLResponse);
+	binary.Read(br, binary.LittleEndian, &response.FieldCount);
+	if response.FieldCount != 0xfe {
+		fmt.Printf("Expected EOF! Got %#v\n", response.FieldCount);
+	}
+	binary.Read(br, binary.LittleEndian, &response.WarningCount);
+	binary.Read(br, binary.LittleEndian, &response.ServerStatus);
+	fmt.Printf("EOF = %#v\n", response);
+	return nil;
+}
+
 func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, os.Error) {
 	rs := new(MySQLResultSet);
 	rs.FieldCount = fieldCount;
@@ -131,6 +145,7 @@ func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, o
 		fmt.Printf("Len = %d, Seq = %d\n", ph.Len, ph.Seq);
 		rs.Fields[i] = readFieldPacket(mysql.reader);
 	}
+	readEOFPacket(mysql.reader);
 	return nil, nil;
 }
 
