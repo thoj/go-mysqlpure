@@ -26,54 +26,64 @@ type PacketHeaderR struct {
 	Seq	uint8;
 }
 
-var ProtocolVersion uint8	// Protocol version = 0x10
-var ServerVersion string	// Server string
-var ThreadId uint32		// Current Thread ID
-var ServerCapabilities uint16
-var ServerLanguage uint8
-var ServerStatus uint16
+type MySQLInstance struct {
+	ProtocolVersion		uint8;	// Protocol version = 0x10
+	ServerVersion		string;	// Server string
+	ThreadId		uint32;	// Current Thread ID
+	ServerCapabilities	uint16;
+	ServerLanguage		uint8;
+	ServerStatus		uint16;
 
-var Connected = false
+	Connected	bool;
 
+	scrambleBuffer	[]byte;
+	
+	reader *bufio.Reader;
+	writer *bufio.Writer;
+	connection net.Conn;
 
-var scrambleBuffer []byte
+	database string;
+	username string;
+	password string;
+}
+
 
 //Read initial handshake packet.
-func readInit(br *bufio.Reader) os.Error {
+func (mysql *MySQLInstance) readInit() os.Error {
 	var ph PacketHeaderR;
-	binary.Read(br, binary.LittleEndian, &ph);	//Header (Length and Seqence number)
+	binary.Read(mysql.reader, binary.LittleEndian, &ph);	//Header (Length and Seqence number)
 	if ph.Seq != 0 {
 		// Initial packet must be Seq == 0
 		return os.ErrorString("Unexpected Sequence Number")
 	}
-	binary.Read(br, binary.LittleEndian, &ProtocolVersion);
-	ServerVersion, _ = br.ReadString('\x00');
-	binary.Read(br, binary.LittleEndian, &ThreadId);
+	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ProtocolVersion);
+	mysql.ServerVersion, _ = mysql.reader.ReadString('\x00');
+	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ThreadId);
 	var sb [9]byte;
-	br.Read(&sb);
-	binary.Read(br, binary.LittleEndian, &ServerCapabilities);
-	binary.Read(br, binary.LittleEndian, &ServerLanguage);
-	binary.Read(br, binary.LittleEndian, &ServerStatus);
+	mysql.reader.Read(&sb);
+	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities);
+	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerLanguage);
+	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus);
 	var sb2 [26]byte;
-	br.Read(&sb2);
-	scrambleBuffer = new([20]byte);
-	bytes.Copy(scrambleBuffer[0:8], sb[0:8]);
-	bytes.Copy(scrambleBuffer[8:20], sb2[13:25]);
+	mysql.reader.Read(&sb2);
+	mysql.scrambleBuffer = new([20]byte);
+	bytes.Copy(mysql.scrambleBuffer[0:8], sb[0:8]);
+	bytes.Copy(mysql.scrambleBuffer[8:20], sb2[13:25]);
 	return nil;
 }
 
 //Tries to read OK result error on error packett
-func readResult(br *bufio.Reader) os.Error {
+func (mysql *MySQLInstance) readResult() os.Error {
 	var ph PacketHeaderR;
-	err := binary.Read(br, binary.LittleEndian, &ph);
+	err := binary.Read(mysql.reader, binary.LittleEndian, &ph);
 	var result byte;
-	err = binary.Read(br, binary.LittleEndian, &result);
+	err = binary.Read(mysql.reader, binary.LittleEndian, &result);
 	if result == 0xff {
 		var errcode uint16;
-		binary.Read(br, binary.LittleEndian, &errcode);
+		binary.Read(mysql.reader, binary.LittleEndian, &errcode);
 		status := make([]byte, 6);
-		br.Read(status);
-		msg, _ := br.ReadString(0x00);
+		mysql.reader.Read(status);
+		msg, _ := mysql.reader.ReadString(0x00);
 		return os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), msg));
 	}
 	if err != nil {
@@ -85,27 +95,32 @@ func readResult(br *bufio.Reader) os.Error {
 
 //Connects to mysql server and reads the initial handshake,
 //then tries to login using supplied credentials.
-func Connect(host string, username string, password string, database string) os.Error {
-	conn, err := net.Dial("tcp", "", host);
+func Connect(host string, username string, password string, database string) (*MySQLInstance, os.Error) {
+	var err os.Error;
+	mysql := new(MySQLInstance);
+	mysql.username = username;
+	mysql.password = password;
+	mysql.database = database;
+	mysql.connection, err = net.Dial("tcp", "", host);
 	if err != nil {
-		return os.ErrorString(fmt.Sprintf("Cant connect to %s\n", host))
+		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", host))
 	}
-	br := bufio.NewReader(conn);
-	bw := bufio.NewWriter(conn);
-	if err = readInit(br); err != nil {
-		return err
+	mysql.reader = bufio.NewReader(mysql.connection);
+	mysql.writer = bufio.NewWriter(mysql.connection);
+	if err = mysql.readInit(); err != nil {
+		return nil, err
 	}
-	err = sendAuth(bw, database, username, password);
-	if err = readResult(br); err != nil {
-		return err
+	err = mysql.sendAuth();
+	if err = mysql.readResult(); err != nil {
+		return nil, err
 	}
-	Connected = true;
+	mysql.Connected = true;
 	fmt.Printf("Connected to server\n");
-	return nil;
+	return mysql, nil;
 }
 
 //This is really ugly.
-func mysqlPassword(password []byte) []byte {
+func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 	ctx := sha1.New();
 	ctx.Write(password);
 	stage1 := ctx.Sum();
@@ -132,12 +147,12 @@ func mysqlPassword(password []byte) []byte {
 }
 
 // Try to auth using the MySQL secure auth *crossing fingers*
-func sendAuth(bw *bufio.Writer, database string, username string, password string) os.Error {
+func (mysql *MySQLInstance) sendAuth() os.Error {
 	var clientattr uint32 = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION;
-	var plen int = len(username);
-	if len(database) > 0 {
+	var plen int = len(mysql.username);
+	if len(mysql.database) > 0 {
 		clientattr += CLIENT_CONNECT_WITH_DB;
-		plen += len(database) + 55
+		plen += len(mysql.database) + 55;
 	} else {
 		plen += 54
 	}
@@ -148,19 +163,19 @@ func sendAuth(bw *bufio.Writer, database string, username string, password strin
 	head[3] = 1;
 	binary.LittleEndian.PutUint32(head[4:8], clientattr);
 	binary.LittleEndian.PutUint32(head[8:12], uint32(1073741824));
-	head[12] = ServerLanguage;
-	bw.Write(&head);
+	head[12] = mysql.ServerLanguage;
+ 	mysql.writer.Write(&head);
 	var filler [23]byte;
-	bw.Write(&filler);
-	bw.WriteString(username);
-	bw.Write(filler[0:1]);
-	token := mysqlPassword(strings.Bytes(password));
-	bw.Write(token);
-	if len(database) > 0 {
-		bw.WriteString(database);
-		bw.Write(filler[0:1]);
+	mysql.writer.Write(&filler);
+	mysql.writer.WriteString(mysql.username);
+	mysql.writer.Write(filler[0:1]);
+	token := mysqlPassword(strings.Bytes(mysql.password), mysql.scrambleBuffer);
+	mysql.writer.Write(token);
+	if len(mysql.database) > 0 {
+		mysql.writer.WriteString(mysql.database);
+		mysql.writer.Write(filler[0:1]);
 	}
-	bw.Flush();
+	mysql.writer.Flush();
 
 	return nil;
 
