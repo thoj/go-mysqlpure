@@ -49,14 +49,14 @@ type PacketHeaderR struct {
 	Seq	uint8;
 }
 
-var ProtocolVersion uint8 // Protocol version = 0x10
-var ServerVersion string  // Server string
-var ThreadId uint32	  // Current Thread ID
+var ProtocolVersion uint8	// Protocol version = 0x10
+var ServerVersion string	// Server string
+var ThreadId uint32		// Current Thread ID
 var ServerCapabilities uint16
 var ServerLanguage uint8
 var ServerStatus uint16
 
-var Connected = false;
+var Connected = false
 
 
 var scrambleBuffer []byte
@@ -64,10 +64,10 @@ var scrambleBuffer []byte
 //Read initial handshake packet.
 func readInit(br *bufio.Reader) os.Error {
 	var ph PacketHeaderR;
-	binary.Read(br, binary.LittleEndian, &ph); //Header (Length and Seqence number)
+	binary.Read(br, binary.LittleEndian, &ph);	//Header (Length and Seqence number)
 	if ph.Seq != 0 {
 		// Initial packet must be Seq == 0
-		return os.ErrorString("Unexpected Sequence Number");
+		return os.ErrorString("Unexpected Sequence Number")
 	}
 	binary.Read(br, binary.LittleEndian, &ProtocolVersion);
 	ServerVersion, _ = br.ReadString('\x00');
@@ -88,22 +88,25 @@ func readInit(br *bufio.Reader) os.Error {
 //Tries to read OK result error on error packett
 func readResult(br *bufio.Reader) os.Error {
 	var ph PacketHeaderR;
-	binary.Read(br, binary.LittleEndian, &ph); 
+	err := binary.Read(br, binary.LittleEndian, &ph);
 	var result byte;
-	binary.Read(br, binary.LittleEndian, &result);
+	err = binary.Read(br, binary.LittleEndian, &result);
 	if result == 0xff {
 		var errcode uint16;
 		binary.Read(br, binary.LittleEndian, &errcode);
-		status := make ([]byte, 6 );
+		status := make([]byte, 6);
 		br.Read(status);
 		msg, _ := br.ReadString(0x00);
 		return os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), msg));
 	}
-	fmt.Printf("Result == %x\n", result );
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Result == %x\n", result);
 	return nil;
 }
 
-//Connects to mysql server and reads the initial handshake, 
+//Connects to mysql server and reads the initial handshake,
 //then tries to login using supplied credentials.
 func Connect(host string, username string, password string, database string) os.Error {
 	conn, err := net.Dial("tcp", "", host);
@@ -129,7 +132,7 @@ func mysqlPassword(password []byte) []byte {
 	ctx := sha1.New();
 	ctx.Write(password);
 	stage1 := ctx.Sum();
-	
+
 	ctx = sha1.New();
 	ctx.Write(stage1);
 	stage2 := ctx.Sum();
@@ -142,7 +145,7 @@ func mysqlPassword(password []byte) []byte {
 	token := new([21]byte);
 	token_t := new([20]byte);
 	for i := 0; i < 20; i++ {
-		token[i+1] = result[i] ^ stage1[i];
+		token[i+1] = result[i] ^ stage1[i]
 	}
 	for i := 0; i < 20; i++ {
 		token_t[i] = token[i+1] ^ result[i]
@@ -154,11 +157,17 @@ func mysqlPassword(password []byte) []byte {
 // Try to auth using the MySQL secure auth *crossing fingers*
 func sendAuth(bw *bufio.Writer, database string, username string, password string) os.Error {
 	var clientattr uint32 = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION;
-	var len int = len(username) + len(database) + 55;
+	var plen int = len(username);
+	if len(database) > 0 {
+		clientattr += CLIENT_CONNECT_WITH_DB;
+		plen += len(database) + 55
+	} else {
+		plen += 54
+	}
 	var head [13]byte;
-	head[0] = byte(len);
-	head[1] = byte(len >> 8);
-	head[2] = byte(len >> 16);
+	head[0] = byte(plen);
+	head[1] = byte(plen >> 8);
+	head[2] = byte(plen >> 16);
 	head[3] = 1;
 	binary.LittleEndian.PutUint32(head[4:8], clientattr);
 	binary.LittleEndian.PutUint32(head[8:12], uint32(1073741824));
@@ -170,12 +179,12 @@ func sendAuth(bw *bufio.Writer, database string, username string, password strin
 	bw.Write(filler[0:1]);
 	token := mysqlPassword(strings.Bytes(password));
 	bw.Write(token);
-	bw.WriteString(database);
-	bw.Write(filler[0:1]);
+	if len(database) > 0 {
+		bw.WriteString(database);
+		bw.Write(filler[0:1]);
+	}
 	bw.Flush();
 
 	return nil;
 
 }
-
-	
