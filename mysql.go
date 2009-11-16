@@ -253,6 +253,9 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	return nil;
 
 }
+func (mysql *MySQLInstance) Quit() {
+	mysql.command(COM_QUIT, "");
+}
 
 func (mysql *MySQLInstance) GetRow() *MySQLRow {
 	return mysql.readRowPacket(mysql.reader)
