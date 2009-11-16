@@ -7,3 +7,7 @@ The wire protocol is documented here:
 
 STATUS:
 Very simple queries should work. See test.go for example.
+
+Output of test:
+Id      User    Host    db      Command Time    State   Info
+82376   test    127.0.0.1:46252 test    Query   0       NULL    SHOW PROCESSLIST
