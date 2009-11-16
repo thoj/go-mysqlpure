@@ -6,4 +6,4 @@ The wire protocol is documented here:
  http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol
 
 STATUS:
-Only Auth implented currently.
+Very simple queries should work. See test.go for example.
