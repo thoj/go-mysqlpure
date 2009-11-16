@@ -6,9 +6,7 @@
 
 package mysql
 
-
 import (
-	"fmt";
 	"net";
 	"os";
 	"bytes";
@@ -16,28 +14,13 @@ import (
 	"encoding/binary";
 	"crypto/sha1";
 	"strings";
+	"fmt";
 )
-
-type MySQLField struct {
-	Catalog		string;
-	Db		string;
-	Table		string;
-	OrgTable	string;
-	Name		string;
-	OrgName		string;
-
-	Charset		uint16;
-	Length		uint32;
-	Type		uint8;
-	Flags		uint16;
-	Decimals	uint8;
-	Default		uint64;
-}
-
 
 type MySQLResultSet struct {
 	FieldCount	uint64;
 	Fields		[]*MySQLField;
+	Rows		[]*MySQLRow;
 }
 
 type MySQLResponse struct {
@@ -70,6 +53,8 @@ type MySQLInstance struct {
 	database	string;
 	username	string;
 	password	string;
+
+	CurrentResultSet	*MySQLResultSet;
 }
 
 
@@ -107,7 +92,6 @@ func readFieldPacket(br *bufio.Reader) *MySQLField {
 	f.OrgName = readLengthCodedString(br);
 	var filler [2]byte;
 	br.Read(filler[0:1]);
-	fmt.Printf("%v\n", filler[0:1]);
 	binary.Read(br, binary.LittleEndian, &f.Charset);
 	binary.Read(br, binary.LittleEndian, &f.Length);
 	binary.Read(br, binary.LittleEndian, &f.Type);
@@ -116,37 +100,67 @@ func readFieldPacket(br *bufio.Reader) *MySQLField {
 	br.Read(filler[0:1]);
 	eb := readLengthCodedBinary(br);
 	f.Default = eb.Value;
-	fmt.Printf("%#v\n", f);
 	return f;
 }
 
 func readEOFPacket(br *bufio.Reader) os.Error {
 	readHeader(br);
-		
+
 	response := new(MySQLResponse);
 	binary.Read(br, binary.LittleEndian, &response.FieldCount);
 	if response.FieldCount != 0xfe {
-		fmt.Printf("Expected EOF! Got %#v\n", response.FieldCount);
+		fmt.Printf("Expected EOF! Got %#v\n", response.FieldCount)
 	}
 	binary.Read(br, binary.LittleEndian, &response.WarningCount);
 	binary.Read(br, binary.LittleEndian, &response.ServerStatus);
-	fmt.Printf("EOF = %#v\n", response);
 	return nil;
+}
+
+func (mysql *MySQLInstance) readRowPacket(br *bufio.Reader) *MySQLRow {
+	readHeader(br);
+	var bl uint8;
+	binary.Read(br, binary.LittleEndian, &bl);
+	if bl == 0xfe {
+		return nil
+	}
+	buf := make([]byte, bl);
+	br.Read(buf);
+	row := new(MySQLRow);
+	row.Data = make([]*MySQLData, mysql.CurrentResultSet.FieldCount);
+	data := new(MySQLData);
+	data.Data = buf;
+	data.Length = uint64(bl);
+	data.Type = mysql.CurrentResultSet.Fields[0].Type;
+	row.Data[0] = data;
+	for i := uint64(1); i < mysql.CurrentResultSet.FieldCount; i++ {
+		binary.Read(br, binary.LittleEndian, &bl);
+		data = new(MySQLData);
+		if bl == 0xfb {
+			data.IsNull = true;
+			bl = 0;
+		}
+		buf = make([]byte, bl);
+		br.Read(buf);
+		data.Data = buf;
+		data.Length = uint64(bl);
+		data.Type = mysql.CurrentResultSet.Fields[i].Type;
+		row.Data[i] = data;
+	}
+	return row;
 }
 
 func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, os.Error) {
 	rs := new(MySQLResultSet);
 	rs.FieldCount = fieldCount;
-	fmt.Printf("Columns = %d\n", rs.FieldCount);
 	rs.Fields = make([]*MySQLField, rs.FieldCount);
 	var i uint64;
 	for i = 0; i < rs.FieldCount; i++ {
-		ph := readHeader(mysql.reader);
-		fmt.Printf("Len = %d, Seq = %d\n", ph.Len, ph.Seq);
+		readHeader(mysql.reader);
 		rs.Fields[i] = readFieldPacket(mysql.reader);
 	}
 	readEOFPacket(mysql.reader);
-	return nil, nil;
+	mysql.CurrentResultSet = rs;
+	return rs, nil;
 }
 
 //Tries to read OK result error on error packett
@@ -175,7 +189,6 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount);
 
 	} else if response.FieldCount > 0x00 && response.FieldCount < 0xFB {	//Result|Field|Row Data
-		fmt.Printf("Field Count = %d\n", response.FieldCount);
 		rs, _ := mysql.readResultSet(uint64(response.FieldCount));
 		response.ResultSet = rs;
 		return response, err;
@@ -205,6 +218,7 @@ func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLRes
 
 	return mysql.readResult();
 }
+
 // Try to auth using the MySQL secure auth *crossing fingers*
 func (mysql *MySQLInstance) sendAuth() os.Error {
 	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION;
@@ -240,6 +254,10 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 
 }
 
+func (mysql *MySQLInstance) GetRow() *MySQLRow {
+	return mysql.readRowPacket(mysql.reader)
+}
+
 func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	response := new(MySQLResponse);
 	response, err := mysql.command(COM_QUERY, arg);
@@ -264,13 +282,10 @@ func Connect(host string, username string, password string, database string) (*M
 		return nil, err
 	}
 	err = mysql.sendAuth();
-	var response *MySQLResponse;
-	if response, err = mysql.readResult(); err != nil {
+	if _ , err = mysql.readResult(); err != nil {
 		return nil, err
 	}
-	fmt.Printf("Response: %#v\n", response);
 	mysql.Connected = true;
-	fmt.Printf("Connected to server\n");
 	return mysql, nil;
 }
 
