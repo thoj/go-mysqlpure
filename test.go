@@ -14,12 +14,18 @@ func main() {
 		os.Exit(1);
 	}
 	fmt.Printf("Connected to %s\n", dbh.ServerVersion);
-	var res * mysql.MySQLResponse;
-	res, err = dbh.Query("SHOW PROCESSLIST");
-	res, err = dbh.Query("SELECT * FROM test");
+	_, err = dbh.Query("SHOW PROCESSLIST");
+	row := dbh.GetRow();
+	for i := 0; i < len(row.Data); i++ {	
+		fmt.Printf("%s\t", dbh.CurrentResultSet.Fields[i]);
+	}
+	fmt.Printf("\n");
+	for i := 0; i < len(row.Data); i++ {	
+		fmt.Printf("%s\t", row.Data[i]);
+	}
+	fmt.Printf("\n");
 	if err != nil {
 		fmt.Printf("%s\n", err);
 		os.Exit(1);
 	}
-	fmt.Printf("%#v\n", res);
 }
