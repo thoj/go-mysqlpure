@@ -24,7 +24,7 @@ type MySQLResponse struct {
 func (r *MySQLResponse) String() string {
 	var msg string;
 	if r == nil {
-		return "nil";
+		return "nil"
 	}
 	if r.FieldCount == 0x00 {
 		msg = fmt.Sprintf("Response = OK")
