@@ -19,6 +19,7 @@ type MySQLResponse struct {
 	Message		[]string;
 
 	ResultSet	*MySQLResultSet;
+	mysql		*MySQLInstance;
 }
 
 func (r *MySQLResponse) String() string {

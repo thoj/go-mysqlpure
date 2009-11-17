@@ -36,8 +36,6 @@ type MySQLInstance struct {
 	database	string;
 	username	string;
 	password	string;
-
-	CurrentResultSet	*MySQLResultSet;
 }
 
 
@@ -66,7 +64,7 @@ func (mysql *MySQLInstance) readInit() os.Error {
 }
 
 
-func (mysql *MySQLInstance) readRowPacket(br *bufio.Reader) *MySQLRow {
+func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 	readHeader(br);
 	var bl uint8;
 	binary.Read(br, binary.LittleEndian, &bl);
@@ -76,13 +74,13 @@ func (mysql *MySQLInstance) readRowPacket(br *bufio.Reader) *MySQLRow {
 	buf := make([]byte, bl);
 	br.Read(buf);
 	row := new(MySQLRow);
-	row.Data = make([]*MySQLData, mysql.CurrentResultSet.FieldCount);
+	row.Data = make([]*MySQLData, res.ResultSet.FieldCount);
 	data := new(MySQLData);
 	data.Data = buf;
 	data.Length = uint64(bl);
-	data.Type = mysql.CurrentResultSet.Fields[0].Type;
+	data.Type = res.ResultSet.Fields[0].Type;
 	row.Data[0] = data;
-	for i := uint64(1); i < mysql.CurrentResultSet.FieldCount; i++ {
+	for i := uint64(1); i < res.ResultSet.FieldCount; i++ {
 		binary.Read(br, binary.LittleEndian, &bl);
 		data = new(MySQLData);
 		if bl == 0xfb {
@@ -93,7 +91,7 @@ func (mysql *MySQLInstance) readRowPacket(br *bufio.Reader) *MySQLRow {
 		br.Read(buf);
 		data.Data = buf;
 		data.Length = uint64(bl);
-		data.Type = mysql.CurrentResultSet.Fields[i].Type;
+		data.Type = res.ResultSet.Fields[i].Type;
 		row.Data[i] = data;
 	}
 	return row;
@@ -109,7 +107,6 @@ func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, o
 		rs.Fields[i] = readFieldPacket(mysql.reader);
 	}
 	readEOFPacket(mysql.reader);
-	mysql.CurrentResultSet = rs;
 	return rs, nil;
 }
 
@@ -215,13 +212,14 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 func (mysql *MySQLInstance) Use(arg string)	{ mysql.command(COM_INIT_DB, arg) }
 func (mysql *MySQLInstance) Quit()		{ mysql.command(COM_QUIT, "") }
 
-func (mysql *MySQLInstance) FetchRow() *MySQLRow {
-	return mysql.readRowPacket(mysql.reader)
+func (rs *MySQLResponse) FetchRow() *MySQLRow {
+	return rs.readRowPacket(rs.mysql.reader)
 }
 
 func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	response := new(MySQLResponse);
 	response, err := mysql.command(COM_QUERY, arg);
+	response.mysql = mysql;
 	return response, err;
 }
 

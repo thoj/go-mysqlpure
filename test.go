@@ -26,10 +26,11 @@ func main() {
 	}
 	res, err = dbh.Query(fmt.Sprintf("DELETE FROM test WHERE id=%d", res.InsertId));
 	fmt.Printf("%s\n", res);
-/*
-	for row := dbh.FetchRow(); row != nil; row = dbh.FetchRow() {
+	res, err = dbh.Query("SELECT * FROM test");
+	fmt.Printf("%s\n", res);
+	for row := res.FetchRow(); row != nil; row = res.FetchRow() {
 		for i := 0; i < len(row.Data); i++ {
-			fmt.Printf("%s\t", dbh.CurrentResultSet.Fields[i])
+			fmt.Printf("%s\t", res.ResultSet.Fields[i])
 		}
 		fmt.Printf("\n");
 		for i := 0; i < len(row.Data); i++ {
@@ -41,6 +42,5 @@ func main() {
 			os.Exit(1);
 		}
 	}
-*/
 	dbh.Quit();
 }
