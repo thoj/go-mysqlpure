@@ -56,7 +56,7 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	mysql.reader.Read(&sb);
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities);
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerLanguage);
-	inary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus);
+	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus);
 	var sb2 [26]byte;
 	mysql.reader.Read(&sb2);
 	mysql.scrambleBuffer = new([20]byte);
@@ -203,9 +203,7 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	return nil;
 
 }
-func (mysql *MySQLInstance) Quit() {
-	mysql.command(COM_QUIT, "");
-}
+func (mysql *MySQLInstance) Quit()	{ mysql.command(COM_QUIT, "") }
 
 func (mysql *MySQLInstance) FetchRow() *MySQLRow {
 	return mysql.readRowPacket(mysql.reader)
@@ -235,11 +233,9 @@ func Connect(host string, username string, password string, database string) (*M
 		return nil, err
 	}
 	err = mysql.sendAuth();
-	if _ , err = mysql.readResult(); err != nil {
+	if _, err = mysql.readResult(); err != nil {
 		return nil, err
 	}
 	mysql.Connected = true;
 	return mysql, nil;
 }
-
-

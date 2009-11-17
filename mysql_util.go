@@ -5,7 +5,7 @@ import (
 	"bufio";
 	"os";
 	"fmt";
-	"crypto/sha1";	
+	"crypto/sha1";
 )
 
 
@@ -32,9 +32,9 @@ func readHeader(br *bufio.Reader) *PacketHeader {
 func readLengthCodedString(br *bufio.Reader) string {
 	var bl uint8;
 	binary.Read(br, binary.LittleEndian, &bl);
-	b := make([]byte,bl);
+	b := make([]byte, bl);
 	br.Read(b);
-	return string(b);	
+	return string(b);
 }
 
 // Read Length Encoded Binary
