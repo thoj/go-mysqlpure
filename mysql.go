@@ -12,27 +12,10 @@ import (
 	"bytes";
 	"bufio";
 	"encoding/binary";
-	"crypto/sha1";
 	"strings";
 	"fmt";
 )
 
-type MySQLResultSet struct {
-	FieldCount	uint64;
-	Fields		[]*MySQLField;
-	Rows		[]*MySQLRow;
-}
-
-type MySQLResponse struct {
-	FieldCount	uint8;
-	AffectedRows	uint64;
-	InsertId	uint64;
-	ServerStatus	uint16;
-	WarningCount	uint16;
-	Message		[]string;
-
-	ResultSet	*MySQLResultSet;
-}
 
 type MySQLInstance struct {
 	ProtocolVersion		uint8;	// Protocol version = 0x10
@@ -73,7 +56,7 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	mysql.reader.Read(&sb);
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities);
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerLanguage);
-	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus);
+	inary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus);
 	var sb2 [26]byte;
 	mysql.reader.Read(&sb2);
 	mysql.scrambleBuffer = new([20]byte);
@@ -82,39 +65,6 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	return nil;
 }
 
-func readFieldPacket(br *bufio.Reader) *MySQLField {
-	f := new(MySQLField);
-	f.Catalog = readLengthCodedString(br);
-	f.Db = readLengthCodedString(br);
-	f.Table = readLengthCodedString(br);
-	f.OrgTable = readLengthCodedString(br);
-	f.Name = readLengthCodedString(br);
-	f.OrgName = readLengthCodedString(br);
-	var filler [2]byte;
-	br.Read(filler[0:1]);
-	binary.Read(br, binary.LittleEndian, &f.Charset);
-	binary.Read(br, binary.LittleEndian, &f.Length);
-	binary.Read(br, binary.LittleEndian, &f.Type);
-	binary.Read(br, binary.LittleEndian, &f.Flags);
-	binary.Read(br, binary.LittleEndian, &f.Decimals);
-	br.Read(filler[0:1]);
-	eb := readLengthCodedBinary(br);
-	f.Default = eb.Value;
-	return f;
-}
-
-func readEOFPacket(br *bufio.Reader) os.Error {
-	readHeader(br);
-
-	response := new(MySQLResponse);
-	binary.Read(br, binary.LittleEndian, &response.FieldCount);
-	if response.FieldCount != 0xfe {
-		fmt.Printf("Expected EOF! Got %#v\n", response.FieldCount)
-	}
-	binary.Read(br, binary.LittleEndian, &response.WarningCount);
-	binary.Read(br, binary.LittleEndian, &response.ServerStatus);
-	return nil;
-}
 
 func (mysql *MySQLInstance) readRowPacket(br *bufio.Reader) *MySQLRow {
 	readHeader(br);
@@ -257,7 +207,7 @@ func (mysql *MySQLInstance) Quit() {
 	mysql.command(COM_QUIT, "");
 }
 
-func (mysql *MySQLInstance) GetRow() *MySQLRow {
+func (mysql *MySQLInstance) FetchRow() *MySQLRow {
 	return mysql.readRowPacket(mysql.reader)
 }
 
@@ -293,29 +243,3 @@ func Connect(host string, username string, password string, database string) (*M
 }
 
 
-//This is really ugly.
-func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
-	ctx := sha1.New();
-	ctx.Write(password);
-	stage1 := ctx.Sum();
-
-	ctx = sha1.New();
-	ctx.Write(stage1);
-	stage2 := ctx.Sum();
-
-	ctx = sha1.New();
-	ctx.Write(scrambleBuffer);
-	ctx.Write(stage2);
-	result := ctx.Sum();
-
-	token := new([21]byte);
-	token_t := new([20]byte);
-	for i := 0; i < 20; i++ {
-		token[i+1] = result[i] ^ stage1[i]
-	}
-	for i := 0; i < 20; i++ {
-		token_t[i] = token[i+1] ^ result[i]
-	}
-	token[0] = 20;
-	return token;
-}

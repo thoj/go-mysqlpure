@@ -3,6 +3,9 @@ package mysql
 import (
 	"encoding/binary";
 	"bufio";
+	"os";
+	"fmt";
+	"crypto/sha1";	
 )
 
 
@@ -95,4 +98,66 @@ func byteToUInt32LE(b []byte, n uint8) uint32 {
 		r += uint32(b[i] << (i * 8))
 	}
 	return r;
+}
+
+func readFieldPacket(br *bufio.Reader) *MySQLField {
+	f := new(MySQLField);
+	f.Catalog = readLengthCodedString(br);
+	f.Db = readLengthCodedString(br);
+	f.Table = readLengthCodedString(br);
+	f.OrgTable = readLengthCodedString(br);
+	f.Name = readLengthCodedString(br);
+	f.OrgName = readLengthCodedString(br);
+	var filler [2]byte;
+	br.Read(filler[0:1]);
+	binary.Read(br, binary.LittleEndian, &f.Charset);
+	binary.Read(br, binary.LittleEndian, &f.Length);
+	binary.Read(br, binary.LittleEndian, &f.Type);
+	binary.Read(br, binary.LittleEndian, &f.Flags);
+	binary.Read(br, binary.LittleEndian, &f.Decimals);
+	br.Read(filler[0:1]);
+	eb := readLengthCodedBinary(br);
+	f.Default = eb.Value;
+	return f;
+}
+
+func readEOFPacket(br *bufio.Reader) os.Error {
+	readHeader(br);
+
+	response := new(MySQLResponse);
+	binary.Read(br, binary.LittleEndian, &response.FieldCount);
+	if response.FieldCount != 0xfe {
+		fmt.Printf("Expected EOF! Got %#v\n", response.FieldCount)
+	}
+	binary.Read(br, binary.LittleEndian, &response.WarningCount);
+	binary.Read(br, binary.LittleEndian, &response.ServerStatus);
+	return nil;
+}
+
+
+//This is really ugly.
+func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
+	ctx := sha1.New();
+	ctx.Write(password);
+	stage1 := ctx.Sum();
+
+	ctx = sha1.New();
+	ctx.Write(stage1);
+	stage2 := ctx.Sum();
+
+	ctx = sha1.New();
+	ctx.Write(scrambleBuffer);
+	ctx.Write(stage2);
+	result := ctx.Sum();
+
+	token := new([21]byte);
+	token_t := new([20]byte);
+	for i := 0; i < 20; i++ {
+		token[i+1] = result[i] ^ stage1[i]
+	}
+	for i := 0; i < 20; i++ {
+		token_t[i] = token[i+1] ^ result[i]
+	}
+	token[0] = 20;
+	return token;
 }
