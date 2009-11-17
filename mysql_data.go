@@ -1,5 +1,9 @@
 package mysql
 
+import (
+	"fmt";
+)
+
 type MySQLResultSet struct {
 	FieldCount	uint64;
 	Fields		[]*MySQLField;
@@ -15,6 +19,34 @@ type MySQLResponse struct {
 	Message		[]string;
 
 	ResultSet	*MySQLResultSet;
+}
+
+func (r *MySQLResponse) String() string {
+	var msg string;
+	if r == nil {
+		return "nil";
+	}
+	if r.FieldCount == 0x00 {
+		msg = fmt.Sprintf("Response = OK")
+	} else if r.FieldCount == 0xff {
+		msg = fmt.Sprintf("Response = ERROR")
+	} else {
+		msg = fmt.Sprintf("Response = ResultSet")
+	}
+	if r.AffectedRows > 0 {
+		msg = fmt.Sprintf("%s, Affected Rows = %d", msg, r.AffectedRows)
+	}
+	if r.InsertId > 0 {
+		msg = fmt.Sprintf("%s, Insert Id = %d", msg, r.InsertId)
+	}
+	msg = fmt.Sprintf("%s, Server Status = %x", msg, r.ServerStatus);
+	if r.WarningCount > 0 {
+		msg = fmt.Sprintf("%s, Warnings = %x", msg, r.WarningCount)
+	}
+	if len(r.Message) > 0 {
+		msg = fmt.Sprintf("%s, Message = %s", msg, r.Message)
+	}
+	return msg;
 }
 
 type MySQLField struct {
