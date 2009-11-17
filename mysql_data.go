@@ -1,5 +1,22 @@
 package mysql
 
+type MySQLResultSet struct {
+	FieldCount	uint64;
+	Fields		[]*MySQLField;
+	Rows		[]*MySQLRow;
+}
+
+type MySQLResponse struct {
+	FieldCount	uint8;
+	AffectedRows	uint64;
+	InsertId	uint64;
+	ServerStatus	uint16;
+	WarningCount	uint16;
+	Message		[]string;
+
+	ResultSet	*MySQLResultSet;
+}
+
 type MySQLField struct {
 	Catalog		string;
 	Db		string;
