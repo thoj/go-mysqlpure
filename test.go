@@ -8,11 +8,13 @@ import (
 
 
 func main() {
-	dbh, err := mysql.Connect("127.0.0.1:3306", "test", "test", "test");
+	dbh, err := mysql.Connect("unix", "", "/var/run/mysqld/mysqld.sock", "test", "", ""); // Without password, user test, without database.
+	//dbh, err := mysql.Connect("tcp", "", "127.0.0.1:3306", "test", "test", "test"); // With password, user test, with database.
 	if err != nil {
 		fmt.Printf("%s\n", err);
 		os.Exit(1);
 	}
+	dbh.Use("test"); //Select database
 	fmt.Printf("Connected to %s\n", dbh.ServerVersion);
 	res := new(mysql.MySQLResponse);
 //	res, err = dbh.Query("SELECT * FROM releases LIMIT 1000");
