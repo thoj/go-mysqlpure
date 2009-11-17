@@ -127,7 +127,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		binary.Read(mysql.reader, binary.LittleEndian, &errcode);
 		status := make([]byte, 6);
 		mysql.reader.Read(status);
-		msg := make([]byte, ph.Len - 1 - 2 - 6);
+		msg := make([]byte, ph.Len-1-2-6);
 		mysql.reader.Read(msg);
 		return nil, os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), string(msg)));
 
@@ -181,6 +181,9 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	} else {
 		plen += 54
 	}
+	if len(mysql.password) < 1 {
+		plen -= 20
+	}
 	var head [13]byte;
 	head[0] = byte(plen);
 	head[1] = byte(plen >> 8);
@@ -194,8 +197,12 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	mysql.writer.Write(&filler);
 	mysql.writer.WriteString(mysql.username);
 	mysql.writer.Write(filler[0:1]);
-	token := mysqlPassword(strings.Bytes(mysql.password), mysql.scrambleBuffer);
-	mysql.writer.Write(token);
+	if len(mysql.password) > 0 {
+		token := mysqlPassword(strings.Bytes(mysql.password), mysql.scrambleBuffer);
+		mysql.writer.Write(token);
+	} else {
+		mysql.writer.Write(filler[0:1])
+	}
 	if len(mysql.database) > 0 {
 		mysql.writer.WriteString(mysql.database);
 		mysql.writer.Write(filler[0:1]);
@@ -205,7 +212,8 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	return nil;
 
 }
-func (mysql *MySQLInstance) Quit()	{ mysql.command(COM_QUIT, "") }
+func (mysql *MySQLInstance) Use(arg string)	{ mysql.command(COM_INIT_DB, arg) }
+func (mysql *MySQLInstance) Quit()		{ mysql.command(COM_QUIT, "") }
 
 func (mysql *MySQLInstance) FetchRow() *MySQLRow {
 	return mysql.readRowPacket(mysql.reader)
@@ -219,15 +227,16 @@ func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 
 //Connects to mysql server and reads the initial handshake,
 //then tries to login using supplied credentials.
-func Connect(host string, username string, password string, database string) (*MySQLInstance, os.Error) {
+//The first 3 parameters are passed directly to Dial
+func Connect(netstr string, laddrstr string, raddrstr string, username string, password string, database string) (*MySQLInstance, os.Error) {
 	var err os.Error;
 	mysql := new(MySQLInstance);
 	mysql.username = username;
 	mysql.password = password;
 	mysql.database = database;
-	mysql.connection, err = net.Dial("tcp", "", host);
+	mysql.connection, err = net.Dial(netstr, laddrstr, raddrstr);
 	if err != nil {
-		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", host))
+		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", raddrstr))
 	}
 	mysql.reader = bufio.NewReader(mysql.connection);
 	mysql.writer = bufio.NewWriter(mysql.connection);
