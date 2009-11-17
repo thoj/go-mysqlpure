@@ -127,8 +127,9 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		binary.Read(mysql.reader, binary.LittleEndian, &errcode);
 		status := make([]byte, 6);
 		mysql.reader.Read(status);
-		msg, _ := mysql.reader.ReadString(0x00);
-		return nil, os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), msg));
+		msg := make([]byte, ph.Len - 1 - 2 - 6);
+		mysql.reader.Read(msg);
+		return nil, os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), string(msg)));
 
 	} else if response.FieldCount == 0x00 {	// OK
 		eb := readLengthCodedBinary(mysql.reader);
@@ -142,6 +143,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		rs, _ := mysql.readResultSet(uint64(response.FieldCount));
 		response.ResultSet = rs;
 		return response, err;
+
 	} else if response.FieldCount == 0xFE {	// EOF
 		return nil, err
 	}
