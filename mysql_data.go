@@ -17,6 +17,7 @@ type MySQLResponse struct {
 	ServerStatus	uint16;
 	WarningCount	uint16;
 	Message		[]string;
+	EOF		bool;
 
 	ResultSet	*MySQLResultSet;
 	mysql		*MySQLInstance;
@@ -69,7 +70,7 @@ type MySQLField struct {
 func (f *MySQLField) String() string	{ return f.Name }
 
 type MySQLData struct {
-	Data	[]byte;
+	Data	string;
 	Length	uint64;
 	IsNull	bool;
 	Type	uint8;
