@@ -2,8 +2,8 @@ GOFILES = mysql.go mysql_const.go mysql_util.go mysql_data.go
 
 all: $(GOARCH)
 
-clean: 
-	rm *.8 test
+clean: clean_$(GOARCH)
+	rm test
 
 386:	
 	8g $(GOFILES)
@@ -13,13 +13,19 @@ clean:
 x64:
 	6g $(GOFILES)
 	6g test.go
-	6l -o test test.8
+	6l -o test test.6
 
 arm:
 	5g $(GOFILES)
 	5g test.go
-	5l -o test test.8
-test:
-	./test
+	5l -o test test.5
 
+clean_x64:
+	rm *.6
+
+clean_386:
+	rm *.8
+
+clean_arm:
+	rm *.5
 
