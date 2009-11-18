@@ -13,24 +13,24 @@ Very simple queries should work. See test.go for example.
 
 Use
 --------------
-dbh, error = mysql.Connect(net, laddr, raddr, username, password, database)
 Three first parameters are passed to Dial. Unix socket: net = unix, raddr = path to mysql.sock
+	dbh, error = mysql.Connect(net, laddr, raddr, username, password, database)
 
-dbh.Use(database)
 Select database
+	dbh.Use(database)
 
-res, err = dbh.Query(sql)
 Run Query. AffectedRows and InsertId is in res
+	res, err = dbh.Query(sql)
 
-row = res.FetchRow();
 Fetch row from query with resultset.
+	row = res.FetchRow();
 
 
 ### Output of test:
-Connected to 5.0.77-1
-Response = OK, Affected Rows = 1, Insert Id = 11, Server Status = 2
-Response = OK, Affected Rows = 1, Server Status = 2
-Response = ResultSet, Server Status = 0
-id      sha1
-1       a1b7edd205324a89803ed96de72f072201797ce0
+	Connected to 5.0.77-1
+	Response = OK, Affected Rows = 1, Insert Id = 11, Server Status = 2
+	Response = OK, Affected Rows = 1, Server Status = 2
+	Response = ResultSet, Server Status = 0
+	id      sha1
+	1       a1b7edd205324a89803ed96de72f072201797ce0
 
