@@ -41,15 +41,28 @@ func unpackLength(br *bufio.Reader) (uint64, bool) {
 		return unpackNumber(b, 3), false;
 	}
 	b := make([]byte, 8);
-	br.Read(b);
-	return unpackNumber(b, 8), false;
+	n, _ := br.Read(b);
+	if n  == 8 {
+		return unpackNumber(b, 8), false;
+	} 
+	return 0, true;
 }
 
-func unpackString(br *bufio.Reader) string {
-	length, _ := unpackLength(br);
+func unpackString(br *bufio.Reader) (string, bool) {
+	length, isnull := unpackLength(br);
 	b := make([]byte, length);
 	br.Read(b);
-	return string(b);
+	return string(b), isnull;
+}
+
+func peekEOF(br *bufio.Reader) bool {
+	b := make([]byte, 1);
+	br.Read(b);
+	br.UnreadByte();
+	if b[0] == 0xfe {
+		return true;
+	}
+	return false;
 }
 //Convert n bytes to uint64 (Little Endian)
 func unpackNumber(b []byte, n uint8) uint64 {
@@ -77,12 +90,12 @@ func byteToUInt32LE(b []byte, n uint8) uint32 {
 
 func readFieldPacket(br *bufio.Reader) *MySQLField {
 	f := new(MySQLField);
-	f.Catalog = unpackString(br);
-	f.Db = unpackString(br);
-	f.Table = unpackString(br);
-	f.OrgTable = unpackString(br);
-	f.Name = unpackString(br);
-	f.OrgName = unpackString(br);
+	f.Catalog, _ = unpackString(br);
+	f.Db, _ = unpackString(br);
+	f.Table, _ = unpackString(br);
+	f.OrgTable, _ = unpackString(br);
+	f.Name, _ = unpackString(br);
+	f.OrgName, _ = unpackString(br);
 	var filler [2]byte;
 	br.Read(filler[0:1]);
 	binary.Read(br, binary.LittleEndian, &f.Charset);
@@ -93,6 +106,7 @@ func readFieldPacket(br *bufio.Reader) *MySQLField {
 	br.Read(filler[0:1]);
 	eb,_ := unpackLength(br);
 	f.Default = eb;
+  	fmt.Printf("%#v\n", f);	
 	return f;
 }
 
