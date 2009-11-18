@@ -129,10 +129,10 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		return nil, os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), string(msg)));
 
 	} else if response.FieldCount == 0x00 {	// OK
-		eb := readLengthCodedBinary(mysql.reader);
-		response.AffectedRows = eb.Value;
-		eb = readLengthCodedBinary(mysql.reader);
-		response.InsertId = eb.Value;
+		eb, _ := unpackLength(mysql.reader);
+		response.AffectedRows = eb;
+		eb, _ = unpackLength(mysql.reader);
+		response.InsertId = eb;
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.ServerStatus);
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount);
 

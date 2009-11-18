@@ -9,12 +9,6 @@ import (
 )
 
 
-type EncodedBinary struct {
-	Length	uint8;
-	IsNull	bool;
-	Value	uint64;
-}
-
 type PacketHeader struct {
 	Len	uint64;
 	Seq	uint8;
@@ -25,59 +19,40 @@ func readHeader(br *bufio.Reader) *PacketHeader {
 	ph := new(PacketHeader);
 	var i24seq [4]byte;
 	br.Read(&i24seq);
-	ph.Len = byteToUInt64LE(&i24seq, 3);
+	ph.Len = unpackNumber(&i24seq, 3);
 	ph.Seq = i24seq[3];
 	return ph;
 }
-func readLengthCodedString(br *bufio.Reader) string {
+
+func unpackLength(br *bufio.Reader) (uint64, bool) {
 	var bl uint8;
 	binary.Read(br, binary.LittleEndian, &bl);
-	b := make([]byte, bl);
+	if bl < 251 {
+		return uint64(bl), false
+	} else if bl == 251 {
+		return 0, true
+	} else if bl == 252 {
+		b := make([]byte, 2);
+		br.Read(b);
+		return unpackNumber(b, 2), false;
+	} else if bl == 253 {
+		b := make([]byte, 3);
+		br.Read(b);
+		return unpackNumber(b, 3), false;
+	}
+	b := make([]byte, 8);
+	br.Read(b);
+	return unpackNumber(b, 8), false;
+}
+
+func unpackString(br *bufio.Reader) string {
+	length, _ := unpackLength(br);
+	b := make([]byte, length);
 	br.Read(b);
 	return string(b);
 }
-
-// Read Length Encoded Binary
-func readLengthCodedBinary(br *bufio.Reader) *EncodedBinary {
-	var bl uint8;
-	var eb EncodedBinary;
-	binary.Read(br, binary.LittleEndian, &bl);
-	if bl >= 0 && bl < 251 {
-		eb.Length = 1;
-		eb.Value = uint64(bl);
-		eb.IsNull = false;
-		return &eb;
-	}
-	switch bl {
-	case 251:
-		eb.IsNull = true;
-		eb.Length = 0;
-		eb.Value = 0;
-	case 252:
-		eb.IsNull = false;
-		eb.Length = 2;
-		var i16 uint16;
-		binary.Read(br, binary.LittleEndian, &i16);
-		eb.Value = uint64(i16);
-	case 253:
-		eb.IsNull = false;
-		eb.Length = 3;
-		var i24 [3]byte;
-		br.Read(&i24);
-		eb.Value = byteToUInt64LE(&i24, 3);
-	case 254:
-		eb.IsNull = false;
-		eb.Length = 2;
-		var i64 uint64;
-		binary.Read(br, binary.LittleEndian, &i64);
-		eb.Value = i64;
-		;
-	}
-	return &eb;
-}
-
 //Convert n bytes to uint64 (Little Endian)
-func byteToUInt64LE(b []byte, n uint8) uint64 {
+func unpackNumber(b []byte, n uint8) uint64 {
 	if n < 1 {
 		return 0
 	}
@@ -102,12 +77,12 @@ func byteToUInt32LE(b []byte, n uint8) uint32 {
 
 func readFieldPacket(br *bufio.Reader) *MySQLField {
 	f := new(MySQLField);
-	f.Catalog = readLengthCodedString(br);
-	f.Db = readLengthCodedString(br);
-	f.Table = readLengthCodedString(br);
-	f.OrgTable = readLengthCodedString(br);
-	f.Name = readLengthCodedString(br);
-	f.OrgName = readLengthCodedString(br);
+	f.Catalog = unpackString(br);
+	f.Db = unpackString(br);
+	f.Table = unpackString(br);
+	f.OrgTable = unpackString(br);
+	f.Name = unpackString(br);
+	f.OrgName = unpackString(br);
 	var filler [2]byte;
 	br.Read(filler[0:1]);
 	binary.Read(br, binary.LittleEndian, &f.Charset);
@@ -116,8 +91,8 @@ func readFieldPacket(br *bufio.Reader) *MySQLField {
 	binary.Read(br, binary.LittleEndian, &f.Flags);
 	binary.Read(br, binary.LittleEndian, &f.Decimals);
 	br.Read(filler[0:1]);
-	eb := readLengthCodedBinary(br);
-	f.Default = eb.Value;
+	eb,_ := unpackLength(br);
+	f.Default = eb;
 	return f;
 }
 
