@@ -66,31 +66,19 @@ func (mysql *MySQLInstance) readInit() os.Error {
 
 func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 	readHeader(br);
-	var bl uint8;
-	binary.Read(br, binary.LittleEndian, &bl);
-	if bl == 0xfe {
-		return nil
-	}
-	buf := make([]byte, bl);
-	br.Read(buf);
 	row := new(MySQLRow);
 	row.Data = make([]*MySQLData, res.ResultSet.FieldCount);
-	data := new(MySQLData);
-	data.Data = buf;
-	data.Length = uint64(bl);
-	data.Type = res.ResultSet.Fields[0].Type;
-	row.Data[0] = data;
-	for i := uint64(1); i < res.ResultSet.FieldCount; i++ {
-		binary.Read(br, binary.LittleEndian, &bl);
-		data = new(MySQLData);
-		if bl == 0xfb {
-			data.IsNull = true;
-			bl = 0;
-		}
-		buf = make([]byte, bl);
-		br.Read(buf);
-		data.Data = buf;
-		data.Length = uint64(bl);
+	if peekEOF(br) { //FIXME: Ignoring EOF and return nil is a bit hackish.
+		ignore := make([]byte, 5);
+		br.Read(ignore);
+		return nil
+	}
+	for i := uint64(0); i < res.ResultSet.FieldCount; i++ {
+		s, isnull := unpackString(br);
+		data := new(MySQLData);
+		data.IsNull = isnull;
+		data.Data = s;
+		data.Length = uint64(len(s));
 		data.Type = res.ResultSet.Fields[i].Type;
 		row.Data[i] = data;
 	}
@@ -113,11 +101,11 @@ func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, o
 //Tries to read OK result error on error packett
 func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	ph := readHeader(mysql.reader);
-	response := new(MySQLResponse);
 	if ph.Len < 1 {
 		return nil, os.ErrorString("Packet to small")
 	}
-
+	response := new(MySQLResponse);
+	response.EOF = false;
 	err := binary.Read(mysql.reader, binary.LittleEndian, &response.FieldCount);
 	if response.FieldCount == 0xff {	// ERROR
 		var errcode uint16;
@@ -142,7 +130,10 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		return response, err;
 
 	} else if response.FieldCount == 0xFE {	// EOF
-		return nil, err
+		err = binary.Read(mysql.reader, binary.LittleEndian, &response.ServerStatus);
+		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount);
+		response.EOF = true;
+		return response, err;
 	}
 	if err != nil {
 		return nil, err
@@ -163,6 +154,9 @@ func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLRes
 	err = mysql.writer.Flush();
 	if err != nil {
 		return nil, err
+	}
+	if command == COM_QUIT { // Don't bother reading anything more.
+		return nil, nil;
 	}
 
 	return mysql.readResult();
@@ -212,14 +206,14 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 func (mysql *MySQLInstance) Use(arg string)	{ mysql.command(COM_INIT_DB, arg) }
 func (mysql *MySQLInstance) Quit()		{ mysql.command(COM_QUIT, "") }
 
-func (rs *MySQLResponse) FetchRow() *MySQLRow {
-	return rs.readRowPacket(rs.mysql.reader)
-}
+func (rs *MySQLResponse) FetchRow() *MySQLRow	{ return rs.readRowPacket(rs.mysql.reader) }
 
 func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	response := new(MySQLResponse);
 	response, err := mysql.command(COM_QUERY, arg);
-	response.mysql = mysql;
+	if response != nil {
+		response.mysql = mysql
+	}
 	return response, err;
 }
 
