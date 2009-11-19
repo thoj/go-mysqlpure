@@ -41,11 +41,8 @@ func unpackLength(br *bufio.Reader) (uint64, bool) {
 		return unpackNumber(b, 3), false;
 	}
 	b := make([]byte, 8);
-	n, _ := br.Read(b);
-	if n  == 8 {
-		return unpackNumber(b, 8), false;
-	} 
-	return 0, true;
+	br.Read(b);
+	return unpackNumber(b, 8), false;
 }
 
 func unpackString(br *bufio.Reader) (string, bool) {
@@ -60,7 +57,7 @@ func peekEOF(br *bufio.Reader) bool {
 	br.Read(b);
 	br.UnreadByte();
 	if b[0] == 0xfe {
-		return true;
+		return true
 	}
 	return false;
 }
@@ -71,19 +68,7 @@ func unpackNumber(b []byte, n uint8) uint64 {
 	}
 	var r uint64 = 0;
 	for i := uint8(0); i < n; i++ {
-		r += uint64(b[i] << (i * 8))
-	}
-	return r;
-}
-
-//Convert n bytes to uint32 (Little Endian)
-func byteToUInt32LE(b []byte, n uint8) uint32 {
-	if n < 1 {
-		return 0
-	}
-	var r uint32 = 0;
-	for i := uint8(0); i < n; i++ {
-		r += uint32(b[i] << (i * 8))
+		r |= (uint64(b[i]) << (i * 8))
 	}
 	return r;
 }
@@ -104,9 +89,8 @@ func readFieldPacket(br *bufio.Reader) *MySQLField {
 	binary.Read(br, binary.LittleEndian, &f.Flags);
 	binary.Read(br, binary.LittleEndian, &f.Decimals);
 	br.Read(filler[0:1]);
-	eb,_ := unpackLength(br);
+	eb, _ := unpackLength(br);
 	f.Default = eb;
-  	fmt.Printf("%#v\n", f);	
 	return f;
 }
 
