@@ -1,31 +1,6 @@
-GOFILES = mysql.go mysql_const.go mysql_util.go mysql_data.go
+include $(GOROOT)/src/Make.$(GOARCH)
 
-all: $(GOARCH)
+TARG=mysql
+GOFILES=mysql.go mysql_const.go mysql_data.go mysql_util.go
 
-clean: clean_$(GOARCH)
-	rm test
-
-386:	
-	8g $(GOFILES)
-	8g test.go
-	8l -o test test.8
-
-amd64:
-	6g $(GOFILES)
-	6g test.go
-	6l -o test test.6
-
-arm:
-	5g $(GOFILES)
-	5g test.go
-	5l -o test test.5
-
-clean_amd64:
-	rm *.6
-
-clean_386:
-	rm *.8
-
-clean_arm:
-	rm *.5
-
+include $(GOROOT)/src/Make.pkg 
