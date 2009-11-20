@@ -27,20 +27,9 @@ func main() {
 	res, err = dbh.Query(fmt.Sprintf("DELETE FROM test WHERE id=%d", res.InsertId));
 	fmt.Printf("%s\n", res);
 	res, err = dbh.Query("SELECT * FROM test");
-	fmt.Printf("%s\n", res);
-	for row := res.FetchRow(); row != nil; row = res.FetchRow() {
-		for i := 0; i < len(row.Data); i++ {
-			fmt.Printf("%s\t", res.ResultSet.Fields[i])
-		}
-		fmt.Printf("\n");
-		for i := 0; i < len(row.Data); i++ {
-			fmt.Printf("%s\t", row.Data[i])
-		}
-		fmt.Printf("\n");
-		if err != nil {
-			fmt.Printf("%s\n", err);
-			os.Exit(1);
-		}
+	fmt.Printf("-----%s\n", res);
+	for rowmap := res.FetchRowMap(); rowmap != nil; rowmap = res.FetchRowMap() {
+		fmt.Printf("%#v\n", rowmap);
 	}
 	res, err = dbh.Query("SHOW PROCESSLIST");
 	fmt.Printf("%s %s\n", res, err);
