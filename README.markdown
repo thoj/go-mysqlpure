@@ -35,6 +35,6 @@ Run Query. AffectedRows and InsertId is in res
 Fetch row from query with resultset.
 	row = res.FetchRow();
 
-Fetch Row map[string]string from query with resultset.
-	rowmap = res.FetchRow();
+Fetch Row map[string]string.
+	rowmap = res.FetchRowMap();
 
