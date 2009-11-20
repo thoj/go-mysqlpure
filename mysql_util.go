@@ -1,3 +1,7 @@
+/*
+	Utility functions for decoding mysql packets
+*/
+
 package mysql
 
 import (
@@ -8,13 +12,7 @@ import (
 	"crypto/sha1";
 )
 
-
-type PacketHeader struct {
-	Len	uint64;
-	Seq	uint8;
-}
-
-
+//Read mysql packet header
 func readHeader(br *bufio.Reader) *PacketHeader {
 	ph := new(PacketHeader);
 	var i24seq [4]byte;
@@ -24,6 +22,8 @@ func readHeader(br *bufio.Reader) *PacketHeader {
 	return ph;
 }
 
+//Decode length encoded number
+//TODO: *Decode() Check Buffered bytes.
 func unpackLength(br *bufio.Reader) (uint64, bool) {
 	var bl uint8;
 	binary.Read(br, binary.LittleEndian, &bl);
@@ -45,6 +45,7 @@ func unpackLength(br *bufio.Reader) (uint64, bool) {
 	return unpackNumber(b, 8), false;
 }
 
+//Decode length encoded string
 func unpackString(br *bufio.Reader) (string, bool) {
 	length, isnull := unpackLength(br);
 	b := make([]byte, length);
@@ -52,6 +53,7 @@ func unpackString(br *bufio.Reader) (string, bool) {
 	return string(b), isnull;
 }
 
+//Peek and check if packet is EOF
 func peekEOF(br *bufio.Reader) bool {
 	b := make([]byte, 1);
 	br.Read(b);
@@ -61,6 +63,7 @@ func peekEOF(br *bufio.Reader) bool {
 	}
 	return false;
 }
+
 //Convert n bytes to uint64 (Little Endian)
 func unpackNumber(b []byte, n uint8) uint64 {
 	if n < 1 {
@@ -73,6 +76,7 @@ func unpackNumber(b []byte, n uint8) uint64 {
 	return r;
 }
 
+//Read the field data from mysql ResultSet packet
 func readFieldPacket(br *bufio.Reader) *MySQLField {
 	f := new(MySQLField);
 	f.Catalog, _ = unpackString(br);
@@ -81,19 +85,20 @@ func readFieldPacket(br *bufio.Reader) *MySQLField {
 	f.OrgTable, _ = unpackString(br);
 	f.Name, _ = unpackString(br);
 	f.OrgName, _ = unpackString(br);
-	var filler [2]byte;
-	br.Read(filler[0:1]);
+	ignoreBytes(br, 1);
 	binary.Read(br, binary.LittleEndian, &f.Charset);
 	binary.Read(br, binary.LittleEndian, &f.Length);
 	binary.Read(br, binary.LittleEndian, &f.Type);
 	binary.Read(br, binary.LittleEndian, &f.Flags);
 	binary.Read(br, binary.LittleEndian, &f.Decimals);
-	br.Read(filler[0:1]);
+	ignoreBytes(br, 1);
 	eb, _ := unpackLength(br);
 	f.Default = eb;
 	return f;
 }
 
+//Read EOF packet.
+//TODO: Return something useful?
 func readEOFPacket(br *bufio.Reader) os.Error {
 	readHeader(br);
 
@@ -107,8 +112,13 @@ func readEOFPacket(br *bufio.Reader) os.Error {
 	return nil;
 }
 
+//Ignores n bytes in the buffer
+func ignoreBytes(br *bufio.Reader, n int) {
+	buf := make([]byte, n);
+	br.Read(buf);
+}
 
-//This is really ugly.
+//Generate scrabled password using password and scramble buffer.
 func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 	ctx := sha1.New();
 	ctx.Write(password);

@@ -4,6 +4,11 @@ import (
 	"fmt";
 )
 
+type PacketHeader struct {
+	Len	uint64;
+	Seq	uint8;
+}
+
 type MySQLResultSet struct {
 	FieldCount	uint64;
 	Fields		[]*MySQLField;

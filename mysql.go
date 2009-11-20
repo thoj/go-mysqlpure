@@ -68,10 +68,9 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 	readHeader(br);
 	row := new(MySQLRow);
 	row.Data = make([]*MySQLData, res.ResultSet.FieldCount);
-	if peekEOF(br) { //FIXME: Ignoring EOF and return nil is a bit hackish.
-		ignore := make([]byte, 5);
-		br.Read(ignore);
-		return nil
+	if peekEOF(br) {	//FIXME: Ignoring EOF and return nil is a bit hackish.
+		ignoreBytes(br, 5);
+		return nil;
 	}
 	for i := uint64(0); i < res.ResultSet.FieldCount; i++ {
 		s, isnull := unpackString(br);
@@ -107,6 +106,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	response := new(MySQLResponse);
 	response.EOF = false;
 	err := binary.Read(mysql.reader, binary.LittleEndian, &response.FieldCount);
+
 	if response.FieldCount == 0xff {	// ERROR
 		var errcode uint16;
 		binary.Read(mysql.reader, binary.LittleEndian, &errcode);
@@ -134,6 +134,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount);
 		response.EOF = true;
 		return response, err;
+
 	}
 	if err != nil {
 		return nil, err
@@ -155,8 +156,8 @@ func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLRes
 	if err != nil {
 		return nil, err
 	}
-	if command == COM_QUIT { // Don't bother reading anything more.
-		return nil, nil;
+	if command == COM_QUIT {	// Don't bother reading anything more.
+		return nil, nil
 	}
 
 	return mysql.readResult();
@@ -181,7 +182,7 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	head[2] = byte(plen >> 16);
 	head[3] = 1;
 	binary.LittleEndian.PutUint32(head[4:8], uint32(clientFlags));
-	binary.LittleEndian.PutUint32(head[8:12], uint32(1073741824));
+	binary.LittleEndian.PutUint32(head[8:12], uint32(MAX_PACKET_SIZE));
 	head[12] = mysql.ServerLanguage;
 	mysql.writer.Write(&head);
 	var filler [23]byte;
@@ -203,11 +204,14 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	return nil;
 
 }
+
 func (mysql *MySQLInstance) Use(arg string)	{ mysql.command(COM_INIT_DB, arg) }
 func (mysql *MySQLInstance) Quit()		{ mysql.command(COM_QUIT, "") }
 
+//Fetch next row.
 func (rs *MySQLResponse) FetchRow() *MySQLRow	{ return rs.readRowPacket(rs.mysql.reader) }
 
+//Send query to server and read response. Return response object.
 func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	response := new(MySQLResponse);
 	response, err := mysql.command(COM_QUERY, arg);

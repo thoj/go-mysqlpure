@@ -4,6 +4,10 @@
 
 package mysql
 
+const (
+	MAX_PACKET_SIZE = (1 << 24);
+)
+
 type ClientFlags uint32
 
 const (
@@ -28,7 +32,7 @@ const (
 
 )
 
-type MySQLCommand uint8
+type MySQLCommand uint32
 
 const (
 	COM_SLEEP			MySQLCommand	= iota;	//(none, this is an internal thread state)
