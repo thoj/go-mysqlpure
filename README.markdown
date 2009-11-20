@@ -9,8 +9,17 @@ The wire protocol is documented here:
 
 Status
 ---------------
-Simple queries should work. See test.go for example.
-Password auth works.
+* Most queries should work. 
+* Password auth works.
+
+See example/test.go for example.
+
+Install
+--------------
+ $ git clone git@github.com:thoj/Go-MySQL-Client-Library.git
+ $ cd Go-MySQL-Client-Library
+ $ make
+ $ make install
 
 Use
 --------------
@@ -26,12 +35,6 @@ Run Query. AffectedRows and InsertId is in res
 Fetch row from query with resultset.
 	row = res.FetchRow();
 
-
-### Output of test:
-	Connected to 5.0.77-1
-	Response = OK, Affected Rows = 1, Insert Id = 11, Server Status = 2
-	Response = OK, Affected Rows = 1, Server Status = 2
-	Response = ResultSet, Server Status = 0
-	id      sha1
-	1       a1b7edd205324a89803ed96de72f072201797ce0
+Fetch Row map[string]string from query with resultset.
+	rowmap = res.FetchRow();
 
