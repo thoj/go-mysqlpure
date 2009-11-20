@@ -15,10 +15,10 @@ func main() {
 		os.Exit(1);
 	}
 	dbh.Use("test");	//Select database
-	fmt.Printf("Connected to %s\n", dbh.ServerVersion);
+
 	res := new(mysql.MySQLResponse);
-	//	res, err = dbh.Query("SELECT * FROM releases LIMIT 1000");
 	res, err = dbh.Query("INSERT INTO test (sha1) VALUES(SHA1('foo'))");
+
 	fmt.Printf("%s\n", res);
 	if err != nil {
 		fmt.Printf("%s\n", err);

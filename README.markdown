@@ -9,7 +9,8 @@ The wire protocol is documented here:
 
 Status
 ---------------
-Very simple queries should work. See test.go for example. 
+Simple queries should work. See test.go for example.
+Password auth works.
 
 Use
 --------------
