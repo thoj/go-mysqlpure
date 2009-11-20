@@ -211,6 +211,20 @@ func (mysql *MySQLInstance) Quit()		{ mysql.command(COM_QUIT, "") }
 //Fetch next row.
 func (rs *MySQLResponse) FetchRow() *MySQLRow	{ return rs.readRowPacket(rs.mysql.reader) }
 
+//Fetch next row map.
+func (rs *MySQLResponse) FetchRowMap() map[string]string {
+	row := rs.readRowPacket(rs.mysql.reader);
+	if row == nil {
+		return nil
+	}
+	m := make(map[string]string);
+	for i := 0; i < len(row.Data); i++ {
+		fmt.Printf("%s = %s\n", rs.ResultSet.Fields[i].Name, row.Data[i].Data);
+		m[rs.ResultSet.Fields[i].Name] = row.Data[i].Data;
+	}
+	return m;
+}
+
 //Send query to server and read response. Return response object.
 func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	response := new(MySQLResponse);
