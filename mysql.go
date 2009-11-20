@@ -226,6 +226,9 @@ func (rs *MySQLResponse) FetchRowMap() map[string]string {
 
 //Send query to server and read response. Return response object.
 func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
+	if mysql == nil || mysql.connection == nil {
+		return nil, os.ErrorString("Unitilized object Use mysql.Connect()");
+	}
 	response := new(MySQLResponse);
 	response, err := mysql.command(COM_QUERY, arg);
 	if response != nil {
