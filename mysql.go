@@ -219,7 +219,6 @@ func (rs *MySQLResponse) FetchRowMap() map[string]string {
 	}
 	m := make(map[string]string);
 	for i := 0; i < len(row.Data); i++ {
-		fmt.Printf("%s = %s\n", rs.ResultSet.Fields[i].Name, row.Data[i].Data);
 		m[rs.ResultSet.Fields[i].Name] = row.Data[i].Data;
 	}
 	return m;
