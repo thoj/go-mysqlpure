@@ -9,7 +9,6 @@ package mysql
 import (
 	"net";
 	"os";
-	"bytes";
 	"bufio";
 	"encoding/binary";
 	"strings";
@@ -58,8 +57,8 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	var sb2 [26]byte;
 	mysql.reader.Read(&sb2);
 	mysql.scrambleBuffer = new([20]byte);
-	bytes.Copy(mysql.scrambleBuffer[0:8], sb[0:8]);
-	bytes.Copy(mysql.scrambleBuffer[8:20], sb2[13:25]);
+	copy(mysql.scrambleBuffer[0:8], sb[0:8]);
+	copy(mysql.scrambleBuffer[8:20], sb2[13:25]);
 	return nil;
 }
 
@@ -219,7 +218,7 @@ func (rs *MySQLResponse) FetchRowMap() map[string]string {
 	}
 	m := make(map[string]string);
 	for i := 0; i < len(row.Data); i++ {
-		m[rs.ResultSet.Fields[i].Name] = row.Data[i].Data;
+		m[rs.ResultSet.Fields[i].Name] = row.Data[i].Data
 	}
 	return m;
 }
@@ -227,7 +226,7 @@ func (rs *MySQLResponse) FetchRowMap() map[string]string {
 //Send query to server and read response. Return response object.
 func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	if mysql == nil || mysql.connection == nil {
-		return nil, os.ErrorString("Unitilized object Use mysql.Connect()");
+		return nil, os.ErrorString("Unitilized object Use mysql.Connect()")
 	}
 	response := new(MySQLResponse);
 	response, err := mysql.command(COM_QUERY, arg);
