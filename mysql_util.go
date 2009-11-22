@@ -124,11 +124,11 @@ func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 	ctx.Write(password);
 	stage1 := ctx.Sum();
 
-	ctx = sha1.New();
+	ctx.Reset();
 	ctx.Write(stage1);
 	stage2 := ctx.Sum();
 
-	ctx = sha1.New();
+	ctx.Reset();
 	ctx.Write(scrambleBuffer);
 	ctx.Write(stage2);
 	result := ctx.Sum();
