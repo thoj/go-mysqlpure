@@ -49,16 +49,15 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ProtocolVersion);
 	mysql.ServerVersion, _ = mysql.reader.ReadString('\x00');
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ThreadId);
-	var sb [9]byte;
-	mysql.reader.Read(&sb);
+	mysql.scrambleBuffer = new([20]byte);
+	mysql.reader.Read(mysql.scrambleBuffer[0:8]);
+	ignoreBytes(mysql.reader, 1);
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities);
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerLanguage);
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus);
-	var sb2 [26]byte;
-	mysql.reader.Read(&sb2);
-	mysql.scrambleBuffer = new([20]byte);
-	copy(mysql.scrambleBuffer[0:8], sb[0:8]);
-	copy(mysql.scrambleBuffer[8:20], sb2[13:25]);
+	ignoreBytes(mysql.reader, 13);
+	mysql.reader.Read(mysql.scrambleBuffer[8:20]);
+	ignoreBytes(mysql.reader, 1);
 	return nil;
 }
 
