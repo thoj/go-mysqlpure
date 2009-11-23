@@ -103,8 +103,8 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	}
 	response := new(MySQLResponse);
 	response.EOF = false;
-	err := binary.Read(mysql.reader, binary.LittleEndian, &response.FieldCount);
-
+	response.FieldCount, _ = unpackFieldCount(mysql.reader);
+	var err os.Error;
 	if response.FieldCount == 0xff {	// ERROR
 		var errcode uint16;
 		binary.Read(mysql.reader, binary.LittleEndian, &errcode);
@@ -234,6 +234,14 @@ func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	}
 	return response, err;
 }
+
+func (mysql *MySQLInstance) Prepare(arg string) (*MySQLResponse, os.Error) {
+	return mysql.command(COM_STMT_PREPARE, arg);
+}
+
+/*func (mysql *MySQLInstance) Execute(a ...) {
+	return mysql.command(COM_STMT_EXECUTE);
+}*/
 
 //Connects to mysql server and reads the initial handshake,
 //then tries to login using supplied credentials.

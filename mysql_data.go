@@ -16,7 +16,7 @@ type MySQLResultSet struct {
 }
 
 type MySQLResponse struct {
-	FieldCount	uint8;
+	FieldCount	uint64;
 	AffectedRows	uint64;
 	InsertId	uint64;
 	ServerStatus	uint16;

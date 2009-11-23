@@ -39,10 +39,21 @@ func unpackLength(br *bufio.Reader) (uint64, bool) {
 		b := make([]byte, 3);
 		br.Read(b);
 		return unpackNumber(b, 3), false;
+	} else if bl == 254 && br.Buffered() > 8 {
+		b := make([]byte, 8);
+		br.Read(b);
+		return unpackNumber(b, 8), false;
 	}
-	b := make([]byte, 8);
-	br.Read(b);
-	return unpackNumber(b, 8), false;
+	return uint64(bl), false;
+}
+
+//Special case of unpackLength where 0xfe == EOF
+func unpackFieldCount(br *bufio.Reader) (uint64, bool) {
+	if peekEOF(br) {
+		ignoreBytes(br, 1);
+		return uint64(0xfe), false;
+	}
+	return unpackLength(br);
 }
 
 //Decode length encoded string
@@ -103,7 +114,7 @@ func readEOFPacket(br *bufio.Reader) os.Error {
 	readHeader(br);
 
 	response := new(MySQLResponse);
-	binary.Read(br, binary.LittleEndian, &response.FieldCount);
+	response.FieldCount, _ = unpackFieldCount(br);
 	if response.FieldCount != 0xfe {
 		fmt.Printf("Expected EOF! Got %#v\n", response.FieldCount)
 	}
