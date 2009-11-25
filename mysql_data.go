@@ -28,6 +28,11 @@ type MySQLResponse struct {
 	mysql		*MySQLInstance;
 }
 
+
+func (s *MySQLStatement) String() string {
+	return fmt.Sprintf("Statement Id = %d, Columns = %d, Parameters = %d", s.StatementId, s.Columns, s.Parameters)
+}
+
 func (r *MySQLResponse) String() string {
 	var msg string;
 	if r == nil {

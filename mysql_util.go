@@ -56,6 +56,34 @@ func unpackFieldCount(br *bufio.Reader) (uint64, bool) {
 	return unpackLength(br);
 }
 
+func packUint8(bw *bufio.Writer, u uint8) os.Error {
+	return binary.Write(bw, binary.LittleEndian, u);
+}
+
+func packUint16(bw *bufio.Writer, u uint16) os.Error {
+	return binary.Write(bw, binary.LittleEndian, u);
+}
+
+func packUint24(bw *bufio.Writer, u uint32) os.Error {
+	b := make([]byte, 3);
+        b[0] = byte(u);
+        b[1] = byte(u >> 8);
+        b[2] = byte(u >> 16);
+	n, err := bw.Write(b);
+	if n != 3 {
+		return err;
+	}
+	return nil;
+}
+
+func packUint32(bw *bufio.Writer, u uint32) os.Error {
+	return binary.Write(bw, binary.LittleEndian, u);
+}
+
+func packUint64(bw *bufio.Writer, u uint64) os.Error {
+	return binary.Write(bw, binary.LittleEndian, u);
+}
+
 //Decode length encoded string
 func unpackString(br *bufio.Reader) (string, bool) {
 	length, isnull := unpackLength(br);

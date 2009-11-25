@@ -161,6 +161,7 @@ func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLRes
 	return mysql.readResult();
 }
 
+
 // Try to auth using the MySQL secure auth *crossing fingers*
 func (mysql *MySQLInstance) sendAuth() os.Error {
 	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION;
@@ -235,8 +236,8 @@ func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	return response, err;
 }
 
-func (mysql *MySQLInstance) Prepare(arg string) (*MySQLResponse, os.Error) {
-	return mysql.command(COM_STMT_PREPARE, arg);
+func (mysql *MySQLInstance) Prepare(arg string) (*MySQLStatement, os.Error) {
+	return mysql.prepare(arg);
 }
 
 /*func (mysql *MySQLInstance) Execute(a ...) {
