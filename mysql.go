@@ -204,7 +204,7 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 }
 
 func (mysql *MySQLInstance) Use(arg string)	{ mysql.command(COM_INIT_DB, arg) }
-func (mysql *MySQLInstance) Quit()		{ mysql.command(COM_QUIT, "") }
+func (mysql *MySQLInstance) Quit()		{ mysql.command(COM_QUIT, ""); mysql.connection.Close(); }
 
 //Fetch next row.
 func (rs *MySQLResponse) FetchRow() *MySQLRow	{ return rs.readRowPacket(rs.mysql.reader) }
