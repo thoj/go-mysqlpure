@@ -18,6 +18,19 @@ type MySQLStatement struct {
 	mysql		*MySQLInstance;
 }
 
+func encodeTypes(a ...) {
+        v := reflect.NewValue(a).(*reflect.StructValue);
+        fmt.Printf("%d\n", v.NumField());
+        for i := 0; i < v.NumField(); i ++ {
+                f := v.Field(i);
+                fmt.Printf("%#v\n", f);
+                if _, ok := f.(*reflect.StringValue); ok {
+                        fmt.Printf("%s\n", "STRING");
+                }
+        }
+}
+
+
 func (sth *MySQLStatement) Execute(va ...) os.Error {
 	if sth.Parameters != len(va) {
 		return os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, len(va)));
@@ -33,7 +46,7 @@ func (sth *MySQLStatement) Execute(va ...) os.Error {
 	b := make([]byte, bitmap_len);
 	mysql.writer.Write(b); //TODO: Support null params.
 	packUint8(mysql.writer, uint8(1));
-	for i := 0
+	encodeTypes(va);}
 }
 
 func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
