@@ -18,24 +18,42 @@ type MySQLStatement struct {
 	mysql		*MySQLInstance;
 }
 
-func encodeTypes(a ...) {
-        v := reflect.NewValue(a).(*reflect.StructValue);
-        fmt.Printf("%d\n", v.NumField());
-        for i := 0; i < v.NumField(); i ++ {
-                f := v.Field(i);
-                fmt.Printf("%#v\n", f);
-                if _, ok := f.(*reflect.StringValue); ok {
-                        fmt.Printf("%s\n", "STRING");
-                }
-        }
+// Encode values fro each field
+func encodeParamValues(bw *bufio.Writer, a ...) {
+	v := reflect.NewValue(a).(*reflect.StructValue);
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Field(i);
+		fmt.Printf("%#v\n", f);
+		switch f.(type) {
+		case *reflect.StringValue:
+			fmt.Printf("STRING\n")
+		case *reflect.IntValue:
+			fmt.Printf("INT\n")
+		}
+	}
 }
 
+// For each field encode 2 byte type code. First bit is signed/unsigned
+func encodeParamTypes(bw *bufio.Writer, a ...) {
+	t := reflect.Typeof(i);
+	v := reflect.NewValue(a).(*reflect.StructValue);
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Field(i);
+		fmt.Printf("%#v\n", f);
+		switch f.(type) {
+		case *reflect.StringValue:
+			fmt.Printf("STRING\n")
+		case *reflect.IntValue:
+			fmt.Printf("INT\n")
+		}
+	}
+}
 
 func (sth *MySQLStatement) Execute(va ...) os.Error {
 	if sth.Parameters != len(va) {
-		return os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, len(va)));
+		return os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, len(va)))
 	}
-	bitmap_len = (len(va) + 7)/8;
+	bitmap_len = (len(va) + 7) / 8;
 	mysql := sth.mysql;
 	packUint24(mysql.writer, uint32(11+bitmap_len+(len(va))*2));
 	packUint8(mysql.writer, uint8(1));
@@ -44,9 +62,11 @@ func (sth *MySQLStatement) Execute(va ...) os.Error {
 	packUint8(mysql.writer, uint8(0));
 	packUint32(mysql.writer, uint32(1));
 	b := make([]byte, bitmap_len);
-	mysql.writer.Write(b); //TODO: Support null params.
+	mysql.writer.Write(b);	//TODO: Support null params.
 	packUint8(mysql.writer, uint8(1));
-	encodeTypes(va);}
+	fmt.Printf("%d\n", v.NumField());
+	encodeParamTypes(mysql.writer, va);
+	encodeParamValues(mysql.writer, va);
 }
 
 func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
@@ -59,7 +79,7 @@ func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
 	if ph.Len >= 12 {
 		ignoreBytes(br, 1);
 		err = binary.Read(br, binary.LittleEndian, &s.Warnings);
-//		fmt.Printf("Warnings = %x\n", s.Warnings);
+		//		fmt.Printf("Warnings = %x\n", s.Warnings);
 	}
 	return s, err;
 }
@@ -69,7 +89,7 @@ func readPrepareParameters(br *bufio.Reader, s *MySQLStatement) os.Error {
 	for i := uint16(0); i < s.Parameters; i++ {
 		ph := readHeader(br);
 		ignoreBytes(br, int(ph.Len));
-//		fmt.Printf("Ignoring %d bytes\n", ph.Len);
+		//		fmt.Printf("Ignoring %d bytes\n", ph.Len);
 	}
 	return nil;
 }
@@ -90,7 +110,7 @@ func (mysql *MySQLInstance) prepare(arg string) (*MySQLStatement, os.Error) {
 		return nil, err;
 	}
 	sth, err := readPrepareInit(mysql.reader);
-//	fmt.Printf("%#v\n", sth);
+	//	fmt.Printf("%#v\n", sth);
 	if sth.Parameters > 0 {
 		readPrepareParameters(mysql.reader, sth)
 	}
