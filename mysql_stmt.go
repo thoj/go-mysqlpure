@@ -35,7 +35,6 @@ func encodeParamValues(bw *bufio.Writer, a ...) {
 
 // For each field encode 2 byte type code. First bit is signed/unsigned
 func encodeParamTypes(bw *bufio.Writer, a ...) {
-	t := reflect.Typeof(i);
 	v := reflect.NewValue(a).(*reflect.StructValue);
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Field(i);
@@ -50,12 +49,13 @@ func encodeParamTypes(bw *bufio.Writer, a ...) {
 }
 
 func (sth *MySQLStatement) Execute(va ...) os.Error {
-	if sth.Parameters != len(va) {
-		return os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, len(va)))
+	v := reflect.NewValue(va).(*reflect.StructValue);
+	if int(sth.Parameters) != v.NumField() {
+		return os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, v.NumField()))
 	}
-	bitmap_len = (len(va) + 7) / 8;
+	bitmap_len := (v.NumField() + 7) / 8;
 	mysql := sth.mysql;
-	packUint24(mysql.writer, uint32(11+bitmap_len+(len(va))*2));
+	packUint24(mysql.writer, uint32(11+bitmap_len+v.NumField()*2));
 	packUint8(mysql.writer, uint8(1));
 	packUint8(mysql.writer, uint8(COM_STMT_EXECUTE));
 	packUint32(mysql.writer, uint32(sth.StatementId));
@@ -67,6 +67,7 @@ func (sth *MySQLStatement) Execute(va ...) os.Error {
 	fmt.Printf("%d\n", v.NumField());
 	encodeParamTypes(mysql.writer, va);
 	encodeParamValues(mysql.writer, va);
+	return nil;
 }
 
 func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
@@ -116,7 +117,7 @@ func (mysql *MySQLInstance) prepare(arg string) (*MySQLStatement, os.Error) {
 	}
 	readEOFPacket(mysql.reader);
 	if sth.Columns > 0 {
-		rs, err := mysql.readResultSet(uint64(sth.Columns));
+		rs, _ := mysql.readResultSet(uint64(sth.Columns));
 		sth.ResultSet = rs;
 	}
 	readEOFPacket(mysql.reader);
