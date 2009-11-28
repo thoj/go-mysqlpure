@@ -71,6 +71,11 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 		return nil;
 	}
 	for i := uint64(0); i < res.ResultSet.FieldCount; i++ {
+		if res.Prepared {
+			//TODO: Do this right.
+			//fmt.Printf("Ignoring %d bytes of NULL map\n", int((res.ResultSet.FieldCount + 7)/8)+1);
+			ignoreBytes(br, int((res.ResultSet.FieldCount+7)/8)+1)
+		}
 		s, isnull := unpackString(br);
 		data := new(MySQLData);
 		data.IsNull = isnull;
@@ -97,6 +102,9 @@ func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, o
 
 //Tries to read OK result error on error packett
 func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
+	if mysql == nil {
+		panic("mysql undefined")
+	}
 	ph := readHeader(mysql.reader);
 	if ph.Len < 1 {
 		return nil, os.ErrorString("Packet to small")
@@ -104,6 +112,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	response := new(MySQLResponse);
 	response.EOF = false;
 	response.FieldCount, _ = unpackFieldCount(mysql.reader);
+	response.mysql = mysql;
 	var err os.Error;
 	if response.FieldCount == 0xff {	// ERROR
 		var errcode uint16;
@@ -212,6 +221,9 @@ func (rs *MySQLResponse) FetchRow() *MySQLRow	{ return rs.readRowPacket(rs.mysql
 
 //Fetch next row map.
 func (rs *MySQLResponse) FetchRowMap() map[string]string {
+	if rs == nil {
+		panic("rs undefined")
+	}
 	row := rs.readRowPacket(rs.mysql.reader);
 	if row == nil {
 		return nil
@@ -237,13 +249,12 @@ func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 }
 
 func (mysql *MySQLInstance) Prepare(arg string) (*MySQLStatement, os.Error) {
-	return mysql.prepare(arg);
+	return mysql.prepare(arg)
 }
 
-/*func (mysql *MySQLInstance) Execute(a ...) {
-	return mysql.command(COM_STMT_EXECUTE);
-}*/
-
+func (sth *MySQLStatement) Execute(va ...) (*MySQLResponse, os.Error) {
+	return sth.execute(va)
+}
 //Connects to mysql server and reads the initial handshake,
 //then tries to login using supplied credentials.
 //The first 3 parameters are passed directly to Dial

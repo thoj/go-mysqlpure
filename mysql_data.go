@@ -23,6 +23,7 @@ type MySQLResponse struct {
 	WarningCount	uint16;
 	Message		[]string;
 	EOF		bool;
+	Prepared 	bool; //Result from prapered statement
 
 	ResultSet	*MySQLResultSet;
 	mysql		*MySQLInstance;
