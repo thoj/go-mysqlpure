@@ -23,9 +23,15 @@ type MySQLResponse struct {
 	WarningCount	uint16;
 	Message		[]string;
 	EOF		bool;
+	Prepared 	bool; //Result from prapered statement
 
 	ResultSet	*MySQLResultSet;
 	mysql		*MySQLInstance;
+}
+
+
+func (s *MySQLStatement) String() string {
+	return fmt.Sprintf("Statement Id = %d, Columns = %d, Parameters = %d", s.StatementId, s.Columns, s.Parameters)
 }
 
 func (r *MySQLResponse) String() string {

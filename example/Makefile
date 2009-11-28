@@ -1,5 +1,3 @@
-GOFILES = irc.go irc_struct.go
-
 all: $(GOARCH)
 
 clean: clean_$(GOARCH)
@@ -8,10 +6,14 @@ clean: clean_$(GOARCH)
 386:	
 	8g test.go
 	8l -o test test.8
+	8g test_prepared.go
+	8l -o test_prepared test_prepared.8
 
 amd64:
 	6g test.go
 	6l -o test test.6
+	6g test_prepared.go
+	6l -o test_prepared test_prepared.6
 
 arm:
 	5g test.go

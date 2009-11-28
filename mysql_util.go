@@ -10,6 +10,8 @@ import (
 	"os";
 	"fmt";
 	"crypto/sha1";
+	"strings";
+	"bytes";
 )
 
 //Read mysql packet header
@@ -56,12 +58,61 @@ func unpackFieldCount(br *bufio.Reader) (uint64, bool) {
 	return unpackLength(br);
 }
 
+func packUint8(bw *bufio.Writer, u uint8) os.Error {
+	return binary.Write(bw, binary.LittleEndian, u)
+}
+
+func packUint16(bw *bufio.Writer, u uint16) os.Error {
+	return binary.Write(bw, binary.LittleEndian, u)
+}
+
+func packUint24(bw *bufio.Writer, u uint32) os.Error {
+	b := make([]byte, 3);
+	b[0] = byte(u);
+	b[1] = byte(u >> 8);
+	b[2] = byte(u >> 16);
+	n, err := bw.Write(b);
+	if n != 3 {
+		return err
+	}
+	return nil;
+}
+
+func packUint32(bw *bufio.Writer, u uint32) os.Error {
+	return binary.Write(bw, binary.LittleEndian, u)
+}
+
+func packUint64(bw *bufio.Writer, u uint64) os.Error {
+	return binary.Write(bw, binary.LittleEndian, u)
+}
+
 //Decode length encoded string
 func unpackString(br *bufio.Reader) (string, bool) {
 	length, isnull := unpackLength(br);
 	b := make([]byte, length);
 	br.Read(b);
 	return string(b), isnull;
+}
+
+func packString(s string) []byte {
+	sb := strings.Bytes(s);
+	size := make([]byte, 1);
+	v := len(sb);
+	if v < 250 {
+		size[0] = uint8(v);
+		return bytes.Add(size, sb);
+	}
+	size = make([]byte, 9);
+	size[0] = 254;
+	size[1] = byte(v);
+	size[2] = byte(v >> 8);
+	size[3] = byte(v >> 16);
+	size[4] = byte(v >> 24);
+	size[5] = byte(v >> 32);
+	size[6] = byte(v >> 40);
+	size[7] = byte(v >> 48);
+	size[8] = byte(v >> 56);
+	return bytes.Add(size, sb);
 }
 
 //Peek and check if packet is EOF
