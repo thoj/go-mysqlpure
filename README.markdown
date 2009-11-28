@@ -1,6 +1,6 @@
 Project Goal
 ----------------
-The goal of this project is to implemnt the MySQL wire protocol in Go,
+The goal of this project is to implement the MySQL wire protocol in Go,
 mostly for my own amusement but it might become usable as a client 
 library for other Go projects.
 
@@ -10,7 +10,7 @@ The wire protocol is documented here:
 Status
 ---------------
 * Most queries should work. 
-* Password auth works.
+* Password Authentication works.
 * Server side prepared statements should work.
 
 See example/test.go for simple example.
@@ -35,13 +35,13 @@ Select database
 Run simple Query. AffectedRows and InsertId is in res
 	res, err = dbh.Query(sql)
 
-Prepeare server side statement.
+Prepare server side statement.
 	sth, err = dbh.Prepare(<SQL with ? placeholders>);
 
 Execute prepared statement (Only supports string, int, float parameters):
 	res, err = sth.Execute(parameters ...);
 
-Fetch row from query with resultset.
+Fetch row from query with result set.
 	row = res.FetchRow();
 
 Fetch Row map[string]string.
