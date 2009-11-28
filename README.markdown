@@ -11,8 +11,11 @@ Status
 ---------------
 * Most queries should work. 
 * Password auth works.
+* Server side prepared statements should work.
 
-See example/test.go for example.
+See example/test.go for simple example.
+See example/test_prepared.go for example using server side prepared statements.
+
 
 Install
 --------------
@@ -29,8 +32,14 @@ Three first parameters are passed to Dial. Unix socket: net = unix, raddr = path
 Select database
 	dbh.Use(database)
 
-Run Query. AffectedRows and InsertId is in res
+Run simple Query. AffectedRows and InsertId is in res
 	res, err = dbh.Query(sql)
+
+Prepeare server side statement.
+	sth, err = dbh.Prepare(<SQL with ? placeholders>);
+
+Execute prepared statement (Only supports string, int, float parameters):
+	res, err = sth.Execute(parameters ...);
 
 Fetch row from query with resultset.
 	row = res.FetchRow();
