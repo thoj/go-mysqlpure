@@ -21,7 +21,6 @@ func readHeader(br *bufio.Reader) *PacketHeader {
 	br.Read(&i24seq);
 	ph.Len = unpackNumber(&i24seq, 3);
 	ph.Seq = i24seq[3];
-	fmt.Printf("%s\n", ph);
 	return ph;
 }
 

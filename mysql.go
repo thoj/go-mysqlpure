@@ -64,7 +64,6 @@ func (mysql *MySQLInstance) readInit() os.Error {
 
 func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 	readHeader(br);
-	fmt.Printf("readRowPacket\n");
 	row := new(MySQLRow);
 	row.Data = make([]*MySQLData, res.ResultSet.FieldCount);
 	if peekEOF(br) {	//FIXME: Ignoring EOF and return nil is a bit hackish.
@@ -73,7 +72,6 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 	}
 	if res.Prepared {
 		//TODO: Do this right.
-		fmt.Printf("Skipping = %d\n", int(res.ResultSet.FieldCount+9)/8+1);
 		ignoreBytes(br, int(res.ResultSet.FieldCount+9)/8+1);
 	}
 	for i := uint64(0); i < res.ResultSet.FieldCount; i++ {
@@ -87,7 +85,6 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 		}
 		data.IsNull = isnull;
 		data.Data = s;
-		fmt.Printf("--> %s\n", s);
 		data.Length = uint64(len(s));
 		data.Type = res.ResultSet.Fields[i].Type;
 		row.Data[i] = data;
