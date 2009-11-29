@@ -64,22 +64,30 @@ func (mysql *MySQLInstance) readInit() os.Error {
 
 func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 	readHeader(br);
+	fmt.Printf("readRowPacket\n");
 	row := new(MySQLRow);
 	row.Data = make([]*MySQLData, res.ResultSet.FieldCount);
 	if peekEOF(br) {	//FIXME: Ignoring EOF and return nil is a bit hackish.
 		ignoreBytes(br, 5);
 		return nil;
 	}
+	if res.Prepared {
+		//TODO: Do this right.
+		fmt.Printf("Skipping = %d\n", int(res.ResultSet.FieldCount+9)/8+1);
+		ignoreBytes(br, int(res.ResultSet.FieldCount+9)/8+1);
+	}
 	for i := uint64(0); i < res.ResultSet.FieldCount; i++ {
-		if res.Prepared {
-			//TODO: Do this right.
-			//fmt.Printf("Ignoring %d bytes of NULL map\n", int((res.ResultSet.FieldCount + 7)/8)+1);
-			ignoreBytes(br, int((res.ResultSet.FieldCount+7)/8)+1)
-		}
-		s, isnull := unpackString(br);
 		data := new(MySQLData);
+		var s string;
+		var isnull bool;
+		if res.Prepared {
+			s, isnull = readFieldData(br, res.ResultSet.Fields[i])
+		} else {
+			s, isnull = unpackString(br)
+		}
 		data.IsNull = isnull;
 		data.Data = s;
+		fmt.Printf("--> %s\n", s);
 		data.Length = uint64(len(s));
 		data.Type = res.ResultSet.Fields[i].Type;
 		row.Data[i] = data;
@@ -159,10 +167,10 @@ func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLRes
 	head[4] = uint8(command);
 	_, err := mysql.writer.Write(&head);
 	err = mysql.writer.WriteString(arg);
-	err = mysql.writer.Flush();
-	if err != nil {
+	if err = mysql.writer.Flush(); err != nil {
 		return nil, err
 	}
+
 	if command == COM_QUIT {	// Don't bother reading anything more.
 		return nil, nil
 	}
@@ -214,7 +222,10 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 }
 
 func (mysql *MySQLInstance) Use(arg string)	{ mysql.command(COM_INIT_DB, arg) }
-func (mysql *MySQLInstance) Quit()		{ mysql.command(COM_QUIT, ""); mysql.connection.Close(); }
+func (mysql *MySQLInstance) Quit() {
+	mysql.command(COM_QUIT, "");
+	mysql.connection.Close();
+}
 
 //Fetch next row.
 func (rs *MySQLResponse) FetchRow() *MySQLRow	{ return rs.readRowPacket(rs.mysql.reader) }

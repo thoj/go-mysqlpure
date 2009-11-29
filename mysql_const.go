@@ -29,13 +29,11 @@ const (
 	CLIENT_SECURE_CONNECTION			= 32768;	/* New 4.1 authentication */
 	CLIENT_MULTI_STATEMENTS				= 65536;	/* Enable/disable multi-stmt support */
 	CLIENT_MULTI_RESULTS				= 131072;	/* Enable/disable multi-results */
-
 )
 
-type MySQLType uint16
 
 const (
-	MYSQL_TYPE_DECIMAL	MySQLType	= iota;
+	MYSQL_TYPE_DECIMAL	uint8	= iota;
 	MYSQL_TYPE_TINY;
 	MYSQL_TYPE_SHORT;
 	MYSQL_TYPE_LONG;
