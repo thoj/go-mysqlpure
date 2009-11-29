@@ -11,7 +11,7 @@ Status
 ---------------
 * Most queries should work. 
 * Password Authentication works.
-* Server side prepared statements should work.
+* Server side prepared statements should work. (With common types)
 
 See example/test.go for simple example.
 See example/test_prepared.go for example using server side prepared statements.
