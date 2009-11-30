@@ -68,7 +68,7 @@ func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
 	s := new(MySQLStatement);
 	err := binary.Read(br, binary.LittleEndian, &s.FieldCount);
 	if s.FieldCount == uint8(0xff) {
-		return nil, readErrorPacket(br);
+		return nil, readErrorPacket(br)
 	}
 	err = binary.Read(br, binary.LittleEndian, &s.StatementId);
 	err = binary.Read(br, binary.LittleEndian, &s.Columns);
@@ -132,12 +132,12 @@ func (mysql *MySQLInstance) prepare(arg string) (*MySQLStatement, os.Error) {
 	}
 	sth, err := readPrepareInit(mysql.reader);
 	if err != nil {
-		return nil, err;
+		return nil, err
 	}
 	if sth.Parameters > 0 {
-		readPrepareParameters(mysql.reader, sth)
+		readPrepareParameters(mysql.reader, sth);
+		readEOFPacket(mysql.reader);
 	}
-	readEOFPacket(mysql.reader);
 	if sth.Columns > 0 {
 		rs, _ := mysql.readResultSet(uint64(sth.Columns));
 		sth.ResultSet = rs;
