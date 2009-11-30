@@ -159,6 +159,17 @@ func readFieldPacket(br *bufio.Reader) *MySQLField {
 	return f;
 }
 
+//Read error packet
+func readErrorPacket(br *bufio.Reader) os.Error {
+	var errcode uint16;
+	binary.Read(br, binary.LittleEndian, &errcode);
+	status := make([]byte, 6);
+	br.Read(status);
+	msg := make([]byte, br.Buffered());
+	br.Read(msg);
+	return os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), string(msg)));
+}
+
 //Read EOF packet.
 //TODO: Return something useful?
 func readEOFPacket(br *bufio.Reader) os.Error {

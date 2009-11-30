@@ -120,13 +120,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	response.mysql = mysql;
 	var err os.Error;
 	if response.FieldCount == 0xff {	// ERROR
-		var errcode uint16;
-		binary.Read(mysql.reader, binary.LittleEndian, &errcode);
-		status := make([]byte, 6);
-		mysql.reader.Read(status);
-		msg := make([]byte, ph.Len-1-2-6);
-		mysql.reader.Read(msg);
-		return nil, os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), string(msg)));
+		return nil, readErrorPacket(mysql.reader);
 
 	} else if response.FieldCount == 0x00 {	// OK
 		eb, _ := unpackLength(mysql.reader);

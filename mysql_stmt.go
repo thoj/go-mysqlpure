@@ -15,6 +15,7 @@ type MySQLStatement struct {
 	Columns		uint16;
 	Parameters	uint16;
 	Warnings	uint16;
+	FieldCount	uint8;
 
 	ResultSet	*MySQLResultSet;
 	mysql		*MySQLInstance;
@@ -65,8 +66,11 @@ func encodeParamTypes(a ...) ([]byte, int) {
 func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
 	ph := readHeader(br);
 	s := new(MySQLStatement);
-	ignoreBytes(br, 1);
-	err := binary.Read(br, binary.LittleEndian, &s.StatementId);
+	err := binary.Read(br, binary.LittleEndian, &s.FieldCount);
+	if s.FieldCount == uint8(0xff) {
+		return nil, readErrorPacket(br);
+	}
+	err = binary.Read(br, binary.LittleEndian, &s.StatementId);
 	err = binary.Read(br, binary.LittleEndian, &s.Columns);
 	err = binary.Read(br, binary.LittleEndian, &s.Parameters);
 	if ph.Len >= 12 {
@@ -127,6 +131,9 @@ func (mysql *MySQLInstance) prepare(arg string) (*MySQLStatement, os.Error) {
 		return nil, err;
 	}
 	sth, err := readPrepareInit(mysql.reader);
+	if err != nil {
+		return nil, err;
+	}
 	if sth.Parameters > 0 {
 		readPrepareParameters(mysql.reader, sth)
 	}
