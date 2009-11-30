@@ -44,6 +44,9 @@ Execute prepared statement (Only supports string, int, float parameters):
 Fetch row from query with result set.
 	row = res.FetchRow();
 
-Fetch Row map[string]string.
+Fetch one row as map[string]string.
 	rowmap = res.FetchRowMap();
+
+Fetch all rows as []map[string]string.
+	rowsmap = res.FetchAllRowMap();
 
