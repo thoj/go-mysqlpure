@@ -72,7 +72,7 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 	}
 	if res.Prepared {
 		//TODO: Do this right.
-		ignoreBytes(br, int(res.ResultSet.FieldCount+9)/8+1);
+		ignoreBytes(br, int(res.ResultSet.FieldCount+9)/8+1)
 	}
 	for i := uint64(0); i < res.ResultSet.FieldCount; i++ {
 		data := new(MySQLData);
@@ -120,7 +120,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	response.mysql = mysql;
 	var err os.Error;
 	if response.FieldCount == 0xff {	// ERROR
-		return nil, readErrorPacket(mysql.reader);
+		return nil, readErrorPacket(mysql.reader)
 
 	} else if response.FieldCount == 0x00 {	// OK
 		eb, _ := unpackLength(mysql.reader);
@@ -211,11 +211,52 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	return nil;
 
 }
+//Stolen from http://golang.org/doc/effective_go.html#slices
+func appendMap(slice, data []map[string]string) []map[string]string {
+	l := len(slice);
+	if l+len(data) > cap(slice) {	// reallocate
+		// Allocate double what's needed, for future growth.
+		newSlice := make([]map[string]string, (l+len(data))*2);
+		// Copy data (could use bytes.Copy()).
+		for i, c := range slice {
+			newSlice[i] = c
+		}
+		slice = newSlice;
+	}
+	slice = slice[0 : l+len(data)];
+	for i, c := range data {
+		slice[l+i] = c
+	}
+	return slice;
+}
+
 
 func (mysql *MySQLInstance) Use(arg string)	{ mysql.command(COM_INIT_DB, arg) }
 func (mysql *MySQLInstance) Quit() {
 	mysql.command(COM_QUIT, "");
 	mysql.connection.Close();
+}
+
+const (
+	PRE_ALLOCATE = 2;
+)
+
+//Fetches all rows from result
+func (rs *MySQLResponse) FetchAllRowMap() []map[string]string {
+	rr := make([]map[string]string, PRE_ALLOCATE);	// Good tradeoff? Probably not.
+	tmp := make([]map[string]string, 1);		//What?
+	row := 0;
+	for r := rs.FetchRowMap(); r != nil; r = rs.FetchRowMap() {
+		if row < PRE_ALLOCATE {
+			rr[row] = r
+		} else {
+			tmp[0] = r;
+			rr = appendMap(rr, tmp);
+		}
+		row++;
+
+	}
+	return rr;
 }
 
 //Fetch next row.
