@@ -216,7 +216,7 @@ func appendMap(slice, data []map[string]string) []map[string]string {
 	l := len(slice);
 	if l+len(data) > cap(slice) {	// reallocate
 		// Allocate double what's needed, for future growth.
-		newSlice := make([]map[string]string, (l+len(data))*2);
+		newSlice := make([]map[string]string, (l+len(data))*PRE_ALLOCATE);
 		// Copy data (could use bytes.Copy()).
 		for i, c := range slice {
 			newSlice[i] = c
@@ -238,7 +238,7 @@ func (mysql *MySQLInstance) Quit() {
 }
 
 const (
-	PRE_ALLOCATE = 2;
+	PRE_ALLOCATE = 30;
 )
 
 //Fetches all rows from result
@@ -256,7 +256,7 @@ func (rs *MySQLResponse) FetchAllRowMap() []map[string]string {
 		row++;
 
 	}
-	return rr;
+	return rr[0:row];
 }
 
 //Fetch next row.
