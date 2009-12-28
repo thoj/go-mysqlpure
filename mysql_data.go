@@ -1,35 +1,35 @@
 package mysql
 
 import (
-	"fmt";
-	"encoding/binary";
-	"bufio";
-	"time";
+	"fmt"
+	"encoding/binary"
+	"bufio"
+	"time"
 )
 
 type PacketHeader struct {
-	Len	uint64;
-	Seq	uint8;
+	Len uint64
+	Seq uint8
 }
 
 type MySQLResultSet struct {
-	FieldCount	uint64;
-	Fields		[]*MySQLField;
-	Rows		[]*MySQLRow;
+	FieldCount uint64
+	Fields     []*MySQLField
+	Rows       []*MySQLRow
 }
 
 type MySQLResponse struct {
-	FieldCount	uint64;
-	AffectedRows	uint64;
-	InsertId	uint64;
-	ServerStatus	uint16;
-	WarningCount	uint16;
-	Message		[]string;
-	EOF		bool;
-	Prepared	bool;	//Result from prapered statement
+	FieldCount   uint64
+	AffectedRows uint64
+	InsertId     uint64
+	ServerStatus uint16
+	WarningCount uint16
+	Message      []string
+	EOF          bool
+	Prepared     bool //Result from prapered statement
 
-	ResultSet	*MySQLResultSet;
-	mysql		*MySQLInstance;
+	ResultSet *MySQLResultSet
+	mysql     *MySQLInstance
 }
 
 
@@ -38,7 +38,7 @@ func (s *MySQLStatement) String() string {
 }
 
 func (r *MySQLResponse) String() string {
-	var msg string;
+	var msg string
 	if r == nil {
 		return "nil"
 	}
@@ -55,43 +55,43 @@ func (r *MySQLResponse) String() string {
 	if r.InsertId > 0 {
 		msg = fmt.Sprintf("%s, Insert Id = %d", msg, r.InsertId)
 	}
-	msg = fmt.Sprintf("%s, Server Status = %x", msg, r.ServerStatus);
+	msg = fmt.Sprintf("%s, Server Status = %x", msg, r.ServerStatus)
 	if r.WarningCount > 0 {
 		msg = fmt.Sprintf("%s, Warnings = %x", msg, r.WarningCount)
 	}
 	if len(r.Message) > 0 {
 		msg = fmt.Sprintf("%s, Message = %s", msg, r.Message)
 	}
-	return msg;
+	return msg
 }
 
 // This is terrible should return a interface or something instead of converting to strings.
 func readFieldData(br *bufio.Reader, f *MySQLField) (string, bool) {
 	switch f.Type {
 	case MYSQL_TYPE_TINY:
-		var l int8;
-		binary.Read(br, binary.LittleEndian, &l);
-		return fmt.Sprintf("%d", l), false;
+		var l int8
+		binary.Read(br, binary.LittleEndian, &l)
+		return fmt.Sprintf("%d", l), false
 	case MYSQL_TYPE_SHORT:
-		var l int16;
-		binary.Read(br, binary.LittleEndian, &l);
-		return fmt.Sprintf("%d", l), false;
+		var l int16
+		binary.Read(br, binary.LittleEndian, &l)
+		return fmt.Sprintf("%d", l), false
 	case MYSQL_TYPE_LONG:
-		var l int32;
-		binary.Read(br, binary.LittleEndian, &l);
-		return fmt.Sprintf("%d", l), false;
+		var l int32
+		binary.Read(br, binary.LittleEndian, &l)
+		return fmt.Sprintf("%d", l), false
 	case MYSQL_TYPE_LONGLONG:
-		var l int64;
-		binary.Read(br, binary.LittleEndian, &l);
-		return fmt.Sprintf("%d", l), false;
+		var l int64
+		binary.Read(br, binary.LittleEndian, &l)
+		return fmt.Sprintf("%d", l), false
 	case MYSQL_TYPE_FLOAT:
-		var f float32;
-		binary.Read(br, binary.LittleEndian, &f);
-		return fmt.Sprintf("%f", f), false;
+		var f float32
+		binary.Read(br, binary.LittleEndian, &f)
+		return fmt.Sprintf("%f", f), false
 	case MYSQL_TYPE_DOUBLE:
-		var f float64;
-		binary.Read(br, binary.LittleEndian, &f);
-		return fmt.Sprintf("%f", f), false;
+		var f float64
+		binary.Read(br, binary.LittleEndian, &f)
+		return fmt.Sprintf("%f", f), false
 	case MYSQL_TYPE_VAR_STRING:
 		return unpackString(br)
 	case MYSQL_TYPE_STRING:
@@ -99,104 +99,104 @@ func readFieldData(br *bufio.Reader, f *MySQLField) (string, bool) {
 	case MYSQL_TYPE_BLOB:
 		return unpackString(br)
 	case MYSQL_TYPE_DATETIME:
-		dt := unpackDateTime(br);
-		return fmt.Sprintf("%s", dt), false;
+		dt := unpackDateTime(br)
+		return fmt.Sprintf("%s", dt), false
 	case MYSQL_TYPE_DATE:
-		dt := unpackDate(br);
-		return fmt.Sprintf("%s", dt), false;
+		dt := unpackDate(br)
+		return fmt.Sprintf("%s", dt), false
 	case MYSQL_TYPE_TIME:
-		dt := unpackTime(br);
-		return fmt.Sprintf("%s", dt), false;
+		dt := unpackTime(br)
+		return fmt.Sprintf("%s", dt), false
 
 	}
-	fmt.Printf("Unknown type = %s\n", f.Type);
-	return "NULL", true;
+	fmt.Printf("Unknown type = %s\n", f.Type)
+	return "NULL", true
 }
 
 func unpackDate(br *bufio.Reader) *time.Time {
-	dt := new(time.Time);
-	var y uint16;
-	var M, d, n uint8;
-	binary.Read(br, binary.LittleEndian, &n);
-	binary.Read(br, binary.LittleEndian, &y);
-	binary.Read(br, binary.LittleEndian, &M);
-	binary.Read(br, binary.LittleEndian, &d);
-	dt.Year = int64(y);
-	dt.Month = int(M);
-	dt.Day = int(d);
-	dt.Hour = 0;
-	dt.Minute = 0;
-	dt.Second = 0;
-	return dt;
+	dt := new(time.Time)
+	var y uint16
+	var M, d, n uint8
+	binary.Read(br, binary.LittleEndian, &n)
+	binary.Read(br, binary.LittleEndian, &y)
+	binary.Read(br, binary.LittleEndian, &M)
+	binary.Read(br, binary.LittleEndian, &d)
+	dt.Year = int64(y)
+	dt.Month = int(M)
+	dt.Day = int(d)
+	dt.Hour = 0
+	dt.Minute = 0
+	dt.Second = 0
+	return dt
 }
 func unpackTime(br *bufio.Reader) *time.Time {
-	dt := new(time.Time);
-	var h, m, s uint8;
-	ignoreBytes(br, 6);
-	binary.Read(br, binary.LittleEndian, &h);
-	binary.Read(br, binary.LittleEndian, &m);
-	binary.Read(br, binary.LittleEndian, &s);
-	dt.Year = 0;
-	dt.Month = 0;
-	dt.Day = 0;
-	dt.Hour = int(h);
-	dt.Minute = int(m);
-	dt.Second = int(s);
-	return dt;
+	dt := new(time.Time)
+	var h, m, s uint8
+	ignoreBytes(br, 6)
+	binary.Read(br, binary.LittleEndian, &h)
+	binary.Read(br, binary.LittleEndian, &m)
+	binary.Read(br, binary.LittleEndian, &s)
+	dt.Year = 0
+	dt.Month = 0
+	dt.Day = 0
+	dt.Hour = int(h)
+	dt.Minute = int(m)
+	dt.Second = int(s)
+	return dt
 }
 func unpackDateTime(br *bufio.Reader) *time.Time {
-	dt := new(time.Time);
-	var y uint16;
-	var M, d, h, m, s, n uint8;
-	binary.Read(br, binary.LittleEndian, &n);
-	binary.Read(br, binary.LittleEndian, &y);
-	binary.Read(br, binary.LittleEndian, &M);
-	binary.Read(br, binary.LittleEndian, &d);
-	binary.Read(br, binary.LittleEndian, &h);
-	binary.Read(br, binary.LittleEndian, &m);
-	binary.Read(br, binary.LittleEndian, &s);
-	dt.Year = int64(y);
-	dt.Month = int(M);
-	dt.Day = int(d);
-	dt.Hour = int(h);
-	dt.Minute = int(m);
-	dt.Second = int(s);
-	return dt;
+	dt := new(time.Time)
+	var y uint16
+	var M, d, h, m, s, n uint8
+	binary.Read(br, binary.LittleEndian, &n)
+	binary.Read(br, binary.LittleEndian, &y)
+	binary.Read(br, binary.LittleEndian, &M)
+	binary.Read(br, binary.LittleEndian, &d)
+	binary.Read(br, binary.LittleEndian, &h)
+	binary.Read(br, binary.LittleEndian, &m)
+	binary.Read(br, binary.LittleEndian, &s)
+	dt.Year = int64(y)
+	dt.Month = int(M)
+	dt.Day = int(d)
+	dt.Hour = int(h)
+	dt.Minute = int(m)
+	dt.Second = int(s)
+	return dt
 }
 
 
 type MySQLField struct {
-	Catalog		string;
-	Db		string;
-	Table		string;
-	OrgTable	string;
-	Name		string;
-	OrgName		string;
+	Catalog  string
+	Db       string
+	Table    string
+	OrgTable string
+	Name     string
+	OrgName  string
 
-	Charset		uint16;
-	Length		uint32;
-	Type		uint8;
-	Flags		uint16;
-	Decimals	uint8;
-	Default		uint64;
+	Charset  uint16
+	Length   uint32
+	Type     uint8
+	Flags    uint16
+	Decimals uint8
+	Default  uint64
 }
 
-func (f *MySQLField) String() string	{ return f.Name }
+func (f *MySQLField) String() string { return f.Name }
 
 type MySQLData struct {
-	Data	string;
-	Length	uint64;
-	IsNull	bool;
-	Type	uint8;
+	Data   string
+	Length uint64
+	IsNull bool
+	Type   uint8
 }
 
 func (d *MySQLData) String() string {
 	if d.IsNull {
 		return "NULL"
 	}
-	return string(d.Data);
+	return string(d.Data)
 }
 
 type MySQLRow struct {
-	Data []*MySQLData;
+	Data []*MySQLData
 }
