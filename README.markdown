@@ -50,3 +50,8 @@ Fetch one row as map[string]string.
 Fetch all rows as []map[string]string.
 	rowsmap = res.FetchAllRowMap();
 
+FAQ
+----------
+
+Q: I'm getting questionmarks instead of my unicode characters
+A: Run "SET NAMES utf8" query before the select. 
