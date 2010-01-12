@@ -5,7 +5,7 @@ import (
 //	"testing/quick"
 )
 
-func TestSelectString(t *testing.T) {
+func SelectSingleRow(t *testing.T, q string) map[string]string {
 	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "", "test")
 	if err != nil {
 		t.Error(err)
@@ -14,8 +14,9 @@ func TestSelectString(t *testing.T) {
 		t.Error("dbh is nil")
 	}
 	dbh.Use("test")
-
-	res, err := dbh.Query("SELECT * FROM test WHERE name='test1'")
+	
+	res, err := dbh.Query("SET NAMES utf8")
+	res, err = dbh.Query(q)
 
 	if err != nil {
 		t.Error(err)
@@ -25,7 +26,19 @@ func TestSelectString(t *testing.T) {
 		t.Error("row is nil")
 	}
 	dbh.Quit()
-	if row["stuff"] == "1234567890abcdef" {
+	return row;
+}
+
+func TestSelectString(t *testing.T) {
+	row := SelectSingleRow(t, "SELECT * FROM test WHERE name='test1'");
+	if row["stuff"] != "1234567890abcdef" {
+		t.Error(row["stuff"])
+	}
+}
+
+func TestSelectUFT8(t *testing.T) {
+	row := SelectSingleRow(t, "SELECT * FROM test WHERE name='unicodetest1'");
+	if row["stuff"] != "l̡̡̡ ̴̡ı̴̴̡ ̡̡͡|̲̲̲͡͡͡ ̲▫̲͡ ̲̲̲͡͡π̲̲͡͡ ̲̲͡▫̲̲͡͡ ̲|̡̡̡ ̡ ̴̡ı̴̡̡ ̡" {
 		t.Error(row["stuff"])
 	}
 }
