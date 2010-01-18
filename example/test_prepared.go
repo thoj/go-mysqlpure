@@ -8,7 +8,7 @@ import (
 
 
 func main() {
-	dbh, err := mysql.Connect("tcp", "", "127.0.0.1:3306", "predb", "predb", "predb") // With password, user test, with database.
+	dbh, err := mysql.Connect("tcp", "", "127.0.0.1:3306", "test", "", "test") // With password, user test, with database.
 	if err != nil {
 		fmt.Printf("%s\n", err)
 		os.Exit(1)

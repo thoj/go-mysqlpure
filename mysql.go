@@ -157,7 +157,7 @@ func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLRes
 	head[3] = 0
 	head[4] = uint8(command)
 	_, err := mysql.writer.Write(&head)
-	err = mysql.writer.WriteString(arg)
+	_, err = mysql.writer.WriteString(arg)
 	if err = mysql.writer.Flush(); err != nil {
 		return nil, err
 	}

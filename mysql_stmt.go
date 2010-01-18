@@ -124,7 +124,7 @@ func (mysql *MySQLInstance) prepare(arg string) (*MySQLStatement, os.Error) {
 	head[3] = 0
 	head[4] = uint8(COM_STMT_PREPARE)
 	_, err := mysql.writer.Write(&head)
-	err = mysql.writer.WriteString(arg)
+	_, err = mysql.writer.WriteString(arg)
 	err = mysql.writer.Flush()
 	if err != nil {
 		fmt.Printf("%s\n", err)
