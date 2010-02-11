@@ -17,19 +17,20 @@ func main() {
 	dbh.Use("test") //Select database
 
 	res := new(mysql.MySQLResponse)
-	res, err = dbh.Query("INSERT INTO test (sha1) VALUES(SHA1('foo'))")
+//	res, err = dbh.Query("INSERT INTO test (sha1) VALUES(SHA1('foo'))")
 
-	fmt.Printf("%s\n", res)
-	if err != nil {
-		fmt.Printf("%s\n", err)
-		os.Exit(1)
-	}
-	res, err = dbh.Query(fmt.Sprintf("DELETE FROM test WHERE id=%d", res.InsertId))
-	fmt.Printf("%s\n", res)
+//	fmt.Printf("%s\n", res)
+//	if err != nil {
+//		fmt.Printf("%s\n", err)
+//		os.Exit(1)
+//	}
+//	res, err = dbh.Query(fmt.Sprintf("DELETE FROM test WHERE id=%d", res.InsertId))
+//	fmt.Printf("%s\n", res)
 	res, err = dbh.Query("SELECT * FROM test")
 	fmt.Printf("-----%s\n", res)
 	for rowmap := res.FetchRowMap(); rowmap != nil; rowmap = res.FetchRowMap() {
-		fmt.Printf("%#v\n", rowmap)
+		fmt.Printf("%#v ->", rowmap)
+		fmt.Printf("%s\n", rowmap["sha1"]);
 	}
 	res, err = dbh.Query("SHOW PROCESSLIST")
 	fmt.Printf("%s %s\n", res, err)

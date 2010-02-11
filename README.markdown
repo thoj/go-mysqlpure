@@ -19,7 +19,7 @@ See example/test_prepared.go for example using server side prepared statements.
 
 Install
 --------------
-	$ git clone git@github.com:thoj/Go-MySQL-Client-Library.git
+	$ git clone git://github.com/thoj/Go-MySQL-Client-Library.git
 	$ cd Go-MySQL-Client-Library
 	$ make
 	$ make install
