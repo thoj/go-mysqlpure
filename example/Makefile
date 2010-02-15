@@ -1,30 +1,13 @@
-all: $(GOARCH)
+include $(GOROOT)/src/Make.$(GOARCH)
 
-clean: clean_$(GOARCH)
-	rm test
+OBJS := $(patsubst %.go,%.$O,$(wildcard *.go))
+OUT := $(patsubst %.8,%,$(OBJS))
 
-386:	
-	8g test.go
-	8l -o test test.8
-	8g test_prepared.go
-	8l -o test_prepared test_prepared.8
+all: $(OBJS)
 
-amd64:
-	6g test.go
-	6l -o test test.6
-	6g test_prepared.go
-	6l -o test_prepared test_prepared.6
+%.$O: %.go
+	$(GC) $<
+	$(LD) -o $(patsubst %.$O,%,$@) $@
 
-arm:
-	5g test.go
-	5l -o test test.5
-
-clean_amd64:
-	rm *.6
-
-clean_386:
-	rm *.8
-
-clean_arm:
-	rm *.5
-
+clean:
+	rm -f *.$O $(OBJS) $(OUT)
