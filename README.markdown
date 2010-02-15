@@ -19,10 +19,10 @@ Status
 
 Install
 --------------
-> $ git clone git://github.com/thoj/Go-MySQL-Client-Library.git
-> $ cd Go-MySQL-Client-Library
-> $ make
-> $ make install
+	$ git clone git://github.com/thoj/Go-MySQL-Client-Library.git
+	$ cd Go-MySQL-Client-Library
+	$ make
+	$ make install
 
 Use
 --------------
