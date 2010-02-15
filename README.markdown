@@ -4,18 +4,16 @@ The goal of this project is to implement the MySQL wire protocol in Go,
 mostly for my own amusement but it might become usable as a client 
 library for other Go projects.
 
-The wire protocol is documented here: 
- http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol
+The wire protocol is documented [here](http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol "MySQL Wire Protocol Documentation")
 
 Status
 ---------------
-* Most queries should work. 
+* Most queries should work.
 * Password Authentication works.
 * Server side prepared statements should work. (With common types)
 
 * See example/simple.go for simple example.
 * See example/prepared.go for example using server side prepared statements.
-
 
 Install
 --------------
