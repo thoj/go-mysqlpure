@@ -13,8 +13,9 @@ Status
 * Password Authentication works.
 * Server side prepared statements should work. (With common types)
 
-See example/test.go for simple example.
-See example/test_prepared.go for example using server side prepared statements.
+See example/simple.go for simple example.
+
+See example/prepared.go for example using server side prepared statements.
 
 
 Install
@@ -54,4 +55,5 @@ FAQ
 ----------
 
 Q: I'm getting questionmarks instead of my unicode characters
-A: Run "SET NAMES utf8" query before the select. 
+
+A: Run dbh.Query("SET NAMES utf8") before the select query. 
