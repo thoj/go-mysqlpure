@@ -8,12 +8,11 @@ The wire protocol is documented [here](http://forge.mysql.com/wiki/MySQL_Interna
 
 Status
 ---------------
-* Most queries should work.
-* Password Authentication works.
+* Most queries should work
 * Server side prepared statements should work. (With common types)
 
-* See example/simple.go for simple example.
-* See example/prepared.go for example using server side prepared statements.
+* See example/simple.go for simple example
+* See example/prepared.go for example using server side prepared statements
 
 Install
 --------------
@@ -51,4 +50,4 @@ Fetch all rows as []map[string]string
 FAQ
 ----------
 * Q: I'm getting question marks instead of my Unicode characters
-* A: Run `dbh.Query("SET NAMES utf8")` before the select query. 
+* A: Run `dbh.Query("SET NAMES utf8")` before the select query 
