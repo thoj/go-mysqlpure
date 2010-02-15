@@ -10,7 +10,6 @@ Status
 ---------------
 * Most queries should work
 * Server side prepared statements should work. (With common types)
-
 * See example/simple.go for simple example
 * See example/prepared.go for example using server side prepared statements
 
