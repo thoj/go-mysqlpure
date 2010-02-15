@@ -15,13 +15,19 @@ import (
 )
 
 //Read mysql packet header
-func readHeader(br *bufio.Reader) *PacketHeader {
+func readHeader(br *bufio.Reader) (*PacketHeader, os.Error) {
 	ph := new(PacketHeader)
 	var i24seq [4]byte
-	br.Read(&i24seq)
+	nn, err := br.Read(&i24seq)
+	if err != nil {
+		return nil, os.ErrorString(fmt.Sprintf("readHeader: %s", err))
+	}
+	if nn < 4 {
+		return nil, os.ErrorString(fmt.Sprintf("readHeader: Packet to small (%d)", nn))
+	}
 	ph.Len = unpackNumber(&i24seq, 3)
 	ph.Seq = i24seq[3]
-	return ph
+	return ph, nil
 }
 
 //Decode length encoded number
