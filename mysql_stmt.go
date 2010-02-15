@@ -64,9 +64,12 @@ func encodeParamTypes(a ...) ([]byte, int) {
 
 
 func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
-	ph := readHeader(br)
+	ph, err := readHeader(br)
+	if err != nil {
+		return nil, err
+	}
 	s := new(MySQLStatement)
-	err := binary.Read(br, binary.LittleEndian, &s.FieldCount)
+	err = binary.Read(br, binary.LittleEndian, &s.FieldCount)
 	if s.FieldCount == uint8(0xff) {
 		return nil, readErrorPacket(br)
 	}
@@ -83,7 +86,10 @@ func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
 //Currently just skips the pakets as I'm not sure if they are useful.
 func readPrepareParameters(br *bufio.Reader, s *MySQLStatement) os.Error {
 	for i := uint16(0); i < s.Parameters; i++ {
-		ph := readHeader(br)
+		ph, err := readHeader(br)
+		if err != nil {
+			return err
+		}
 		ignoreBytes(br, int(ph.Len))
 	}
 	return nil

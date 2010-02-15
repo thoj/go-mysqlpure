@@ -40,7 +40,10 @@ type MySQLInstance struct {
 
 //Read initial handshake packet.
 func (mysql *MySQLInstance) readInit() os.Error {
-	ph := readHeader(mysql.reader)
+	ph, err := readHeader(mysql.reader)
+	if err != nil {
+		return err
+	}
 
 	if ph.Seq != 0 {
 		// Initial packet must be Seq == 0
@@ -110,15 +113,16 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	if mysql == nil {
 		panic("mysql undefined")
 	}
-	ph := readHeader(mysql.reader)
-	if ph.Len < 1 {
-		return nil, os.ErrorString("Packet to small")
+	ph, err := readHeader(mysql.reader)
+	if err != nil {
+		return nil, os.ErrorString(fmt.Sprintf("readHeader error: %s", err))
+	} else if ph.Len < 1 {
+		// Junk?
 	}
 	response := new(MySQLResponse)
 	response.EOF = false
 	response.FieldCount, _ = unpackFieldCount(mysql.reader)
 	response.mysql = mysql
-	var err os.Error
 	if response.FieldCount == 0xff { // ERROR
 		return nil, readErrorPacket(mysql.reader)
 
@@ -148,7 +152,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	return response, nil
 }
 
-func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLResponse, os.Error) {
+func (dbh *MySQLInstance) mysqlCommand(command MySQLCommand, arg string) (*MySQLResponse, os.Error) {
 	plen := len(arg) + 1
 	var head [5]byte
 	head[0] = byte(plen)
@@ -156,9 +160,9 @@ func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLRes
 	head[2] = byte(plen >> 16)
 	head[3] = 0
 	head[4] = uint8(command)
-	_, err := mysql.writer.Write(&head)
-	_, err = mysql.writer.WriteString(arg)
-	if err = mysql.writer.Flush(); err != nil {
+	_, err := dbh.writer.Write(&head)
+	_, err = dbh.writer.WriteString(arg)
+	if err = dbh.writer.Flush(); err != nil {
 		return nil, err
 	}
 
@@ -166,21 +170,21 @@ func (mysql *MySQLInstance) command(command MySQLCommand, arg string) (*MySQLRes
 		return nil, nil
 	}
 
-	return mysql.readResult()
+	return dbh.readResult()
 }
 
 
 // Try to auth using the MySQL secure auth *crossing fingers*
-func (mysql *MySQLInstance) sendAuth() os.Error {
+func (dbh *MySQLInstance) sendAuth() os.Error {
 	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION
-	var plen int = len(mysql.username)
-	if len(mysql.database) > 0 {
+	var plen int = len(dbh.username)
+	if len(dbh.database) > 0 {
 		clientFlags += CLIENT_CONNECT_WITH_DB
-		plen += len(mysql.database) + 55
+		plen += len(dbh.database) + 55
 	} else {
 		plen += 54
 	}
-	if len(mysql.password) < 1 {
+	if len(dbh.password) < 1 {
 		plen -= 20
 	}
 	var head [13]byte
@@ -190,23 +194,23 @@ func (mysql *MySQLInstance) sendAuth() os.Error {
 	head[3] = 1
 	binary.LittleEndian.PutUint32(head[4:8], uint32(clientFlags))
 	binary.LittleEndian.PutUint32(head[8:12], uint32(MAX_PACKET_SIZE))
-	head[12] = mysql.ServerLanguage
-	mysql.writer.Write(&head)
+	head[12] = dbh.ServerLanguage
+	dbh.writer.Write(&head)
 	var filler [23]byte
-	mysql.writer.Write(&filler)
-	mysql.writer.WriteString(mysql.username)
-	mysql.writer.Write(filler[0:1])
-	if len(mysql.password) > 0 {
-		token := mysqlPassword(strings.Bytes(mysql.password), mysql.scrambleBuffer)
-		mysql.writer.Write(token)
+	dbh.writer.Write(&filler)
+	dbh.writer.WriteString(dbh.username)
+	dbh.writer.Write(filler[0:1])
+	if len(dbh.password) > 0 {
+		token := mysqlPassword(strings.Bytes(dbh.password), dbh.scrambleBuffer)
+		dbh.writer.Write(token)
 	} else {
-		mysql.writer.Write(filler[0:1])
+		dbh.writer.Write(filler[0:1])
 	}
-	if len(mysql.database) > 0 {
-		mysql.writer.WriteString(mysql.database)
-		mysql.writer.Write(filler[0:1])
+	if len(dbh.database) > 0 {
+		dbh.writer.WriteString(dbh.database)
+		dbh.writer.Write(filler[0:1])
 	}
-	mysql.writer.Flush()
+	dbh.writer.Flush()
 
 	return nil
 
@@ -230,11 +234,52 @@ func appendMap(slice, data []map[string]string) []map[string]string {
 	return slice
 }
 
+//Connects to mysql server and reads the initial handshake,
+//then tries to login using supplied credentials.
+//The first 3 parameters are passed directly to Dial
+func Connect(netstr string, laddrstr string, raddrstr string, username string, password string, database string) (*MySQLInstance, os.Error) {
+	var err os.Error
+	dbh := new(MySQLInstance)
+	dbh.username = username
+	dbh.password = password
+	dbh.database = database
+	dbh.connection, err = net.Dial(netstr, laddrstr, raddrstr)
+	if err != nil {
+		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", raddrstr))
+	}
+	dbh.reader = bufio.NewReader(dbh.connection)
+	dbh.writer = bufio.NewWriter(dbh.connection)
+	if err = dbh.readInit(); err != nil {
+		return nil, err
+	}
+	err = dbh.sendAuth()
+	if _, err = dbh.readResult(); err != nil {
+		return nil, err
+	}
+	dbh.Connected = true
+	return dbh, nil
+}
 
-func (mysql *MySQLInstance) Use(arg string) { mysql.command(COM_INIT_DB, arg) }
-func (mysql *MySQLInstance) Quit() {
-	mysql.command(COM_QUIT, "")
-	mysql.connection.Close()
+func (dbh *MySQLInstance) Use(arg string) (*MySQLResponse, os.Error) {
+	if dbh == nil {
+		panic("dbh object is undefined")
+	}
+	return dbh.mysqlCommand(COM_INIT_DB, arg)
+}
+
+func (dbh *MySQLInstance) Quit() {
+	if dbh == nil {
+		panic("dbh object is undefined")
+	}
+	dbh.mysqlCommand(COM_QUIT, "")
+	dbh.connection.Close()
+}
+
+func (dbh *MySQLInstance) Prepare(arg string) (*MySQLStatement, os.Error) {
+	if dbh == nil {
+		panic("dbh object is undefined")
+	}
+	return dbh.prepare(arg)
 }
 
 const (
@@ -279,47 +324,19 @@ func (rs *MySQLResponse) FetchRowMap() map[string]string {
 }
 
 //Send query to server and read response. Return response object.
-func (mysql *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
-	if mysql == nil || mysql.connection == nil {
-		return nil, os.ErrorString("Unitilized object Use mysql.Connect()")
+func (dbh *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
+	if dbh == nil {
+		panic("dbh object is undefined")
 	}
 	response := new(MySQLResponse)
-	response, err := mysql.command(COM_QUERY, arg)
+	response, err := dbh.mysqlCommand(COM_QUERY, arg)
 	if response != nil {
-		response.mysql = mysql
+		response.mysql = dbh
 	}
 	return response, err
 }
 
-func (mysql *MySQLInstance) Prepare(arg string) (*MySQLStatement, os.Error) {
-	return mysql.prepare(arg)
-}
 
 func (sth *MySQLStatement) Execute(va ...) (*MySQLResponse, os.Error) {
 	return sth.execute(va)
-}
-//Connects to mysql server and reads the initial handshake,
-//then tries to login using supplied credentials.
-//The first 3 parameters are passed directly to Dial
-func Connect(netstr string, laddrstr string, raddrstr string, username string, password string, database string) (*MySQLInstance, os.Error) {
-	var err os.Error
-	mysql := new(MySQLInstance)
-	mysql.username = username
-	mysql.password = password
-	mysql.database = database
-	mysql.connection, err = net.Dial(netstr, laddrstr, raddrstr)
-	if err != nil {
-		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", raddrstr))
-	}
-	mysql.reader = bufio.NewReader(mysql.connection)
-	mysql.writer = bufio.NewWriter(mysql.connection)
-	if err = mysql.readInit(); err != nil {
-		return nil, err
-	}
-	err = mysql.sendAuth()
-	if _, err = mysql.readResult(); err != nil {
-		return nil, err
-	}
-	mysql.Connected = true
-	return mysql, nil
 }
