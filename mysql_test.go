@@ -5,7 +5,7 @@ import (
 )
 
 func SelectSingleRow(t *testing.T, q string) map[string]string {
-	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "test")
+	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "")
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -33,7 +33,7 @@ func SelectSingleRow(t *testing.T, q string) map[string]string {
 }
 
 func SelectSingleRowPrepared(t *testing.T, q string, p ...) map[string]string {
-	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "test")
+	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "")
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
