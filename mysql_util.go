@@ -192,7 +192,7 @@ func readEOFPacket(br *bufio.Reader) os.Error {
 }
 
 //Ignores n bytes in the buffer
-func ignoreBytes(br *bufio.Reader, n int) {
+func ignoreBytes(br *bufio.Reader, n uint64) {
 	buf := make([]byte, n)
 	br.Read(buf)
 }

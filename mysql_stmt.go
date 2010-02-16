@@ -90,7 +90,7 @@ func readPrepareParameters(br *bufio.Reader, s *MySQLStatement) os.Error {
 		if err != nil {
 			return err
 		}
-		ignoreBytes(br, int(ph.Len))
+		ignoreBytes(br, ph.Len)
 	}
 	return nil
 }
