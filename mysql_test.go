@@ -87,3 +87,22 @@ func TestSelectEmpty(t *testing.T) {
 		t.Error("Row is not nil")
 	}
 }
+
+func TestError(t *testing.T) {
+	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	if dbh == nil {
+		t.Error("dbh is nil")
+		t.FailNow()
+	}
+	dbh.Use("test")
+
+	res, err := dbh.Query("SELECT * FROM test WHERE namefail='foo'")
+	if res != nil || err == nil {
+		t.Error("err == nil, expected error")
+	}
+	dbh.Quit()
+}
