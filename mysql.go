@@ -65,13 +65,17 @@ func (mysql *MySQLInstance) readInit() os.Error {
 }
 
 
-func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
-	readHeader(br)
+func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (*MySQLRow, os.Error) {
+	_, err := readHeader(br)
+	if err != nil {
+		return nil, err
+	}
+
 	row := new(MySQLRow)
 	row.Data = make([]*MySQLData, res.ResultSet.FieldCount)
 	if peekEOF(br) { //FIXME: Ignoring EOF and return nil is a bit hackish.
 		ignoreBytes(br, 5)
-		return nil
+		return nil, err
 	}
 	if res.Prepared {
 		//TODO: Do this right.
@@ -92,7 +96,7 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) *MySQLRow {
 		data.Type = res.ResultSet.Fields[i].Type
 		row.Data[i] = data
 	}
-	return row
+	return row, err
 }
 
 func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, os.Error) {
@@ -305,15 +309,21 @@ func (rs *MySQLResponse) FetchAllRowMap() []map[string]string {
 }
 
 //Fetch next row.
-func (rs *MySQLResponse) FetchRow() *MySQLRow { return rs.readRowPacket(rs.mysql.reader) }
+func (rs *MySQLResponse) FetchRow() *MySQLRow {
+	row, err := rs.readRowPacket(rs.mysql.reader)
+	if err != nil {
+		return nil
+	}
+	return row
+}
 
 //Fetch next row map.
 func (rs *MySQLResponse) FetchRowMap() map[string]string {
 	if rs == nil {
 		panic("rs undefined")
 	}
-	row := rs.readRowPacket(rs.mysql.reader)
-	if row == nil {
+	row, err := rs.readRowPacket(rs.mysql.reader)
+	if row == nil || err != nil {
 		return nil
 	}
 	m := make(map[string]string)
