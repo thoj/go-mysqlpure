@@ -11,7 +11,6 @@ import (
 	"os"
 	"bufio"
 	"encoding/binary"
-	"strings"
 	"fmt"
 )
 
@@ -205,7 +204,7 @@ func (dbh *MySQLInstance) sendAuth() os.Error {
 	dbh.writer.WriteString(dbh.username)
 	dbh.writer.Write(filler[0:1])
 	if len(dbh.password) > 0 {
-		token := mysqlPassword(strings.Bytes(dbh.password), dbh.scrambleBuffer)
+		token := mysqlPassword([]byte(dbh.password), dbh.scrambleBuffer)
 		dbh.writer.Write(token)
 	} else {
 		dbh.writer.Write(filler[0:1])

@@ -10,7 +10,6 @@ import (
 	"os"
 	"fmt"
 	"crypto/sha1"
-	"strings"
 	"bytes"
 )
 
@@ -101,7 +100,7 @@ func unpackString(br *bufio.Reader) (string, bool) {
 }
 
 func packString(s string) []byte {
-	sb := strings.Bytes(s)
+	sb := []byte(s)
 	size := make([]byte, 1)
 	v := len(sb)
 	if v < 250 {
