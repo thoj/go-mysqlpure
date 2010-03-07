@@ -69,13 +69,13 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (*MySQLRow, os.Error) 
 	if err != nil {
 		return nil, err
 	}
-
 	row := new(MySQLRow)
-	row.Data = make([]*MySQLData, res.ResultSet.FieldCount)
-	if peekEOF(br) { //FIXME: Ignoring EOF and return nil is a bit hackish.
+
+	if peekEOF(br) || res.ResultSet == nil { //FIXME: Ignoring EOF and return nil is a bit hackish.
 		ignoreBytes(br, ph.Len)
 		return nil, err
 	}
+	row.Data = make([]*MySQLData, res.ResultSet.FieldCount)
 	if res.Prepared {
 		//TODO: Do this right.
 		ignoreBytes(br, uint64(res.ResultSet.FieldCount+9)/8+1)
@@ -126,6 +126,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	response.EOF = false
 	response.FieldCount, _ = unpackFieldCount(mysql.reader)
 	response.mysql = mysql
+
 	if response.FieldCount == 0xff { // ERROR
 		return nil, readErrorPacket(mysql.reader)
 
