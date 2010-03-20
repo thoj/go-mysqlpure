@@ -38,7 +38,7 @@ Execute prepared statement (Only supports string, int, float parameters):
 > res, err = sth.Execute(parameters ...)
 
 Fetch row from query with result set  
-> row = res.FetchRow()
+> row, err = res.FetchRow()
 
 Fetch one row as map[string]string  
 > rowmap = res.FetchRowMap()
