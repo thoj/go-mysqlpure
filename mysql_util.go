@@ -183,7 +183,7 @@ func readEOFPacket(br *bufio.Reader) os.Error {
 	response := new(MySQLResponse)
 	response.FieldCount, _ = unpackFieldCount(br)
 	if response.FieldCount != 0xfe {
-		fmt.Printf("Expected EOF! Got %#v\n", response.FieldCount)
+		fmt.Printf("Warning: Expected EOF! Got %#v\n", response.FieldCount)
 	}
 	binary.Read(br, binary.LittleEndian, &response.WarningCount)
 	binary.Read(br, binary.LittleEndian, &response.ServerStatus)
