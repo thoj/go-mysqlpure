@@ -24,7 +24,7 @@ type MySQLResponse struct {
 	InsertId     uint64
 	ServerStatus uint16
 	WarningCount uint16
-	Message      []string
+	Message      string
 	EOF          bool
 	Prepared     bool //Result from prapered statement
 
