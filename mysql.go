@@ -23,7 +23,9 @@ type MySQLInstance struct {
 	ServerLanguage     uint8
 	ServerStatus       uint16
 
-	Connected bool
+	Connected    bool
+	queryDone    bool
+	lastResponse *MySQLResponse
 
 	scrambleBuffer []byte
 
@@ -137,6 +139,9 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		response.InsertId = eb
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.ServerStatus)
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount)
+		mBuf := make([]byte, ph.Len-7)
+		mysql.reader.Read(mBuf)
+		response.Message = string(mBuf)
 
 	} else if response.FieldCount > 0x00 && response.FieldCount < 0xFB { //Result|Field|Row Data
 		rs, _ := mysql.readResultSet(uint64(response.FieldCount))
@@ -261,6 +266,7 @@ func Connect(netstr string, laddrstr string, raddrstr string, username string, p
 		return nil, err
 	}
 	dbh.Connected = true
+	dbh.queryDone = true
 	return dbh, nil
 }
 
@@ -309,12 +315,17 @@ func (rs *MySQLResponse) FetchAllRowMap() []map[string]string {
 }
 
 //Fetch next row.
-func (rs *MySQLResponse) FetchRow() *MySQLRow {
+func (rs *MySQLResponse) FetchRow() (*MySQLRow, os.Error) {
 	row, err := rs.readRowPacket(rs.mysql.reader)
 	if err != nil {
-		return nil
+		rs.mysql.queryDone = true
+		return nil, err
+	} else if row == nil {
+		rs.mysql.queryDone = true
+		return nil, nil
 	}
-	return row
+	rs.mysql.queryDone = false //Hack. Make sure this is false as long as there may be row packets in the buffer!
+	return row, nil
 }
 
 //Fetch next row map.
@@ -322,8 +333,9 @@ func (rs *MySQLResponse) FetchRowMap() map[string]string {
 	if rs == nil {
 		panic("rs undefined")
 	}
-	row, err := rs.readRowPacket(rs.mysql.reader)
+	row, err := rs.FetchRow()
 	if row == nil || err != nil {
+		rs.mysql.queryDone = true
 		return nil
 	}
 	m := make(map[string]string)
@@ -338,14 +350,20 @@ func (dbh *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	if dbh == nil {
 		panic("dbh object is undefined")
 	}
+
+	// Terrible hack to handle unfinished Queries.
+	if dbh.queryDone == false {
+		for r, _ := dbh.lastResponse.FetchRow(); r != nil; r, _ = dbh.lastResponse.FetchRow() {
+		}
+	}
 	response := new(MySQLResponse)
 	response, err := dbh.mysqlCommand(COM_QUERY, arg)
 	if response != nil {
 		response.mysql = dbh
+		dbh.lastResponse = response
 	}
 	return response, err
 }
-
 
 func (sth *MySQLStatement) Execute(va ...) (*MySQLResponse, os.Error) {
 	return sth.execute(va)
