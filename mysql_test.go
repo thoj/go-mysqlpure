@@ -41,7 +41,7 @@ func SelectSingleRowPrepared(t *testing.T, q string, p ...) map[string]string {
 	dbh := MakeDbh(t)
 	dbh.Use("test")
 
-	res, err := dbh.Query("SET NAMES utf8")
+	res := CheckQuery(t, dbh, "SET NAMES utf8")
 	sth, err := dbh.Prepare(q)
 
 	if err != nil {
@@ -107,15 +107,7 @@ func TestSelectEmpty(t *testing.T) {
 }
 
 func TestError(t *testing.T) {
-	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "")
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-	if dbh == nil {
-		t.Error("dbh is nil")
-		t.FailNow()
-	}
+	dbh := MakeDbh(t)
 	dbh.Use("test")
 
 	res, err := dbh.Query("SELECT * FROM test WHERE namefail='foo'")
