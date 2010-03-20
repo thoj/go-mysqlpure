@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func SelectSingleRow(t *testing.T, q string) map[string]string {
-	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "")
+func MakeDbh(t *testing.T) *MySQLInstance {
+	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "test")
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -14,26 +14,31 @@ func SelectSingleRow(t *testing.T, q string) map[string]string {
 		t.Error("dbh is nil")
 		t.FailNow()
 	}
+	return dbh
+}
+
+func CheckQuery(t *testing.T, dbh *MySQLInstance, q string) *MySQLResponse {
+	res, err := dbh.Query(q)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	return res
+}
+
+func SelectSingleRow(t *testing.T, q string) map[string]string {
+	dbh := MakeDbh(t)
 	dbh.Use("test")
 
-	res, err := dbh.Query("SET NAMES utf8")
-	res, err = dbh.Query(q)
-
+	res := CheckQuery(t, dbh, "SET NAMES utf8")
+	res = CheckQuery(t, dbh, q)
 	row := res.FetchRowMap()
 	dbh.Quit()
 	return row
 }
 
 func SelectSingleRowPrepared(t *testing.T, q string, p ...) map[string]string {
-	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "")
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-	if dbh == nil {
-		t.Error("dbh is nil")
-		t.FailNow()
-	}
+	dbh := MakeDbh(t)
 	dbh.Use("test")
 
 	res, err := dbh.Query("SET NAMES utf8")
@@ -47,6 +52,19 @@ func SelectSingleRowPrepared(t *testing.T, q string, p ...) map[string]string {
 	row := res.FetchRowMap()
 	dbh.Quit()
 	return row
+}
+
+func TestUnfinished(t *testing.T) {
+	dbh := MakeDbh(t)
+	res := CheckQuery(t, dbh, "SELECT * FROM test")
+	row := res.FetchRowMap()
+	res = CheckQuery(t, dbh, "SELECT * FROM test WHERE name='test1'")
+	row = res.FetchRowMap()
+	test := "1234567890abcdef"
+	if row == nil || row["stuff"] != test {
+		t.Error(row["stuff"], " != ", test)
+	}
+	dbh.Quit()
 }
 
 func TestSelectString(t *testing.T) {
