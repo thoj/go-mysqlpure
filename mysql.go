@@ -185,7 +185,7 @@ func (dbh *MySQLInstance) mysqlCommand(command MySQLCommand, arg string) (*MySQL
 
 // Try to auth using the MySQL secure auth *crossing fingers*
 func (dbh *MySQLInstance) sendAuth() os.Error {
-	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION
+	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION + CLIENT_MULTI_STATEMENTS
 	var plen int = len(dbh.username)
 	if len(dbh.database) > 0 {
 		clientFlags += CLIENT_CONNECT_WITH_DB
