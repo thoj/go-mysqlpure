@@ -113,7 +113,7 @@ func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, o
 	return rs, nil
 }
 
-//Tries to read OK result error on error packett
+//Tries to read OK result error on error packet
 func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	if mysql == nil {
 		panic("mysql undefined")
@@ -183,9 +183,13 @@ func (dbh *MySQLInstance) mysqlCommand(command MySQLCommand, arg string) (*MySQL
 }
 
 
-// Try to auth using the MySQL secure auth *crossing fingers*
+// Auth using the MySQL secure auth
 func (dbh *MySQLInstance) sendAuth() os.Error {
-	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD + CLIENT_PROTOCOL_41 + CLIENT_SECURE_CONNECTION + CLIENT_MULTI_STATEMENTS
+	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD
+	clientFlags += CLIENT_PROTOCOL_41
+	clientFlags += CLIENT_SECURE_CONNECTION
+	clientFlags += CLIENT_MULTI_STATEMENTS
+	clientFlags += CLIENT_MULTI_RESULTS
 	var plen int = len(dbh.username)
 	if len(dbh.database) > 0 {
 		clientFlags += CLIENT_CONNECT_WITH_DB
