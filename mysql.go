@@ -139,7 +139,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		response.InsertId = eb
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.ServerStatus)
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount)
-		mBuf := make([]byte, ph.Len-7)
+		mBuf := make([]byte, mysql.reader.Buffered())
 		mysql.reader.Read(mBuf)
 		response.Message = string(mBuf)
 
