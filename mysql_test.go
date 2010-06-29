@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"testing"
+	"fmt"
 )
 
 func MakeDbh(t *testing.T) *MySQLInstance {
@@ -37,7 +38,7 @@ func SelectSingleRow(t *testing.T, q string) map[string]string {
 	return row
 }
 
-func SelectSingleRowPrepared(t *testing.T, q string, p ...) map[string]string {
+func SelectSingleRowPrepared(t *testing.T, q string, p ...interface{}) map[string]string {
 	dbh := MakeDbh(t)
 	dbh.Use("test")
 
@@ -52,6 +53,27 @@ func SelectSingleRowPrepared(t *testing.T, q string, p ...) map[string]string {
 	row := res.FetchRowMap()
 	dbh.Quit()
 	return row
+}
+
+
+func TestLongRun(t *testing.T) {
+	dbh := MakeDbh(t)
+	for i := 0; i < 100000; i++ {
+		res := CheckQuery(t, dbh, fmt.Sprintf("INSERT INTO test2 (test, testtest) VALUES(%d, %d)", i, i%10))
+		if res.InsertId < 1 {
+			t.Error("InsertId < 0")
+			t.FailNow()
+		}
+		if i%10000 == 0 {
+			fmt.Printf("%d%%\n", i/1000)
+		}
+	}
+	res := CheckQuery(t, dbh, "DELETE FROM test2")
+	if res.AffectedRows != 100000 {
+		t.Error("AffectedRows = ", res.AffectedRows)
+		t.FailNow()
+	}
+	res = CheckQuery(t, dbh, "TRUNCATE TABLE test2")
 }
 
 func TestUnfinished(t *testing.T) {
