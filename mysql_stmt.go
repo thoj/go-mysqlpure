@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"os"
 	"fmt"
-	"reflect"
 	"bytes"
 	"strconv"
 )
@@ -22,18 +21,17 @@ type MySQLStatement struct {
 }
 
 // Encode values fro each field
-func encodeParamValues(a ...) ([]byte, int) {
-	v := reflect.NewValue(a).(*reflect.StructValue)
+func encodeParamValues(a []interface{}) ([]byte, int) {
 	var b []byte
-	for i := 0; i < v.NumField(); i++ {
-		f := v.Field(i)
+	for i := 0; i < len(a); i++ {
+		f := a[i];
 		switch t := f.(type) {
-		case *reflect.StringValue:
-			b = bytes.Add(b, packString(string(t.Get())))
-		case *reflect.IntValue:
-			b = bytes.Add(b, packString(strconv.Itoa(int(t.Get()))))
-		case *reflect.FloatValue:
-			b = bytes.Add(b, packString(strconv.Ftoa(float(t.Get()), 'f', -1)))
+		case string:
+			b = bytes.Add(b, packString(string(t)))
+		case int:
+			b = bytes.Add(b, packString(strconv.Itoa(int(t))))
+		case float:
+			b = bytes.Add(b, packString(strconv.Ftoa(float(t), 'f', -1)))
 		}
 	}
 	return b, len(b)
@@ -46,13 +44,12 @@ func putuint16(b []byte, v uint16) {
 
 // For each field encode 2 byte type code. First bit is signed/unsigned
 // Cheats and only bind parameters as strings
-func encodeParamTypes(a ...) ([]byte, int) {
-	v := reflect.NewValue(a).(*reflect.StructValue)
-	buf := make([]byte, v.NumField()*2)
+func encodeParamTypes(a []interface{}) ([]byte, int) {
+	buf := make([]byte, len(a)*2)
 	off := 0
-	for i := 0; i < v.NumField(); i++ {
-		f := v.Field(i)
-		if reflect.Indirect(f) == nil {
+	for i := 0; i < len(a); i++ {
+		f := a[i];
+		if f == nil {
 			putuint16(buf[off:off+2], uint16(MYSQL_TYPE_NULL))
 			continue
 		}
@@ -95,14 +92,13 @@ func readPrepareParameters(br *bufio.Reader, s *MySQLStatement) os.Error {
 	return nil
 }
 
-func (sth *MySQLStatement) execute(va ...) (*MySQLResponse, os.Error) {
-	v := reflect.NewValue(va).(*reflect.StructValue)
-	if int(sth.Parameters) != v.NumField() {
-		return nil, os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, v.NumField()))
+func (sth *MySQLStatement) execute(va []interface{}) (*MySQLResponse, os.Error) {
+	if int(sth.Parameters) != len(va) {
+		return nil, os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, len(va)))
 	}
 	type_parm, tn := encodeParamTypes(va)
 	value_parm, vn := encodeParamValues(va)
-	bitmap_len := (v.NumField() + 7) / 8
+	bitmap_len := (len(va) + 7) / 8
 	mysql := sth.mysql
 	packUint24(mysql.writer, uint32(11+bitmap_len+tn+vn))
 	packUint8(mysql.writer, uint8(0))

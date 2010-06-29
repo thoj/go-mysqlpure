@@ -369,6 +369,6 @@ func (dbh *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	return response, err
 }
 
-func (sth *MySQLStatement) Execute(va ...) (*MySQLResponse, os.Error) {
+func (sth *MySQLStatement) Execute(va ...interface{}) (*MySQLResponse, os.Error) {
 	return sth.execute(va)
 }
