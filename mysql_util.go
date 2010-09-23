@@ -16,15 +16,15 @@ import (
 //Read mysql packet header
 func readHeader(br *bufio.Reader) (*PacketHeader, os.Error) {
 	ph := new(PacketHeader)
-	var i24seq [4]byte
-	nn, err := br.Read(&i24seq)
+	i24seq := make([]byte, 4)
+	nn, err := br.Read(i24seq)
 	if err != nil {
 		return nil, os.ErrorString(fmt.Sprintf("readHeader: %s", err))
 	}
 	if nn < 4 {
 		return nil, os.ErrorString(fmt.Sprintf("readHeader: Packet to small (%d)", nn))
 	}
-	ph.Len = unpackNumber(&i24seq, 3)
+	ph.Len = unpackNumber(i24seq, 3)
 	ph.Seq = i24seq[3]
 	return ph, nil
 }
@@ -211,8 +211,8 @@ func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 	ctx.Write(stage2)
 	result := ctx.Sum()
 
-	token := new([21]byte)
-	token_t := new([20]byte)
+	token := make([]byte, 21)
+	token_t := make([]byte, 21)
 	for i := 0; i < 20; i++ {
 		token[i+1] = result[i] ^ stage1[i]
 	}

@@ -53,7 +53,7 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ProtocolVersion)
 	mysql.ServerVersion, _ = mysql.reader.ReadString('\x00')
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ThreadId)
-	mysql.scrambleBuffer = new([20]byte)
+	mysql.scrambleBuffer = make([]byte, 20)
 	mysql.reader.Read(mysql.scrambleBuffer[0:8])
 	ignoreBytes(mysql.reader, 1)
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities)
@@ -163,13 +163,13 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 
 func (dbh *MySQLInstance) mysqlCommand(command MySQLCommand, arg string) (*MySQLResponse, os.Error) {
 	plen := len(arg) + 1
-	var head [5]byte
+	head := make([]byte, 5)
 	head[0] = byte(plen)
 	head[1] = byte(plen >> 8)
 	head[2] = byte(plen >> 16)
 	head[3] = 0
 	head[4] = uint8(command)
-	_, err := dbh.writer.Write(&head)
+	_, err := dbh.writer.Write(head)
 	_, err = dbh.writer.WriteString(arg)
 	if err = dbh.writer.Flush(); err != nil {
 		return nil, err
@@ -200,7 +200,7 @@ func (dbh *MySQLInstance) sendAuth() os.Error {
 	if len(dbh.password) < 1 {
 		plen -= 20
 	}
-	var head [13]byte
+	head := make([]byte, 13)
 	head[0] = byte(plen)
 	head[1] = byte(plen >> 8)
 	head[2] = byte(plen >> 16)
@@ -208,9 +208,9 @@ func (dbh *MySQLInstance) sendAuth() os.Error {
 	binary.LittleEndian.PutUint32(head[4:8], uint32(clientFlags))
 	binary.LittleEndian.PutUint32(head[8:12], uint32(MAX_PACKET_SIZE))
 	head[12] = dbh.ServerLanguage
-	dbh.writer.Write(&head)
-	var filler [23]byte
-	dbh.writer.Write(&filler)
+	dbh.writer.Write(head)
+	filler := make([]byte, 23)
+	dbh.writer.Write(filler)
 	dbh.writer.WriteString(dbh.username)
 	dbh.writer.Write(filler[0:1])
 	if len(dbh.password) > 0 {
