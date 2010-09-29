@@ -28,6 +28,21 @@ CREATE TABLE `test` (
   `stuff` varchar(64) character set utf8 NOT NULL,
   PRIMARY KEY  (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=12 DEFAULT CHARSET=latin1;
+
+
+--
+-- Table structure for table `test2`
+--
+
+DROP TABLE IF EXISTS `test2`;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8;
+CREATE TABLE `test2` (
+  `id` int(11) NOT NULL auto_increment,
+  `test` int(11),
+  `testtest` int(11),
+  PRIMARY KEY  (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=12 DEFAULT CHARSET=latin1;
 SET character_set_client = @saved_cs_client;
 
 --
