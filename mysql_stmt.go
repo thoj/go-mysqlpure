@@ -93,7 +93,7 @@ func readPrepareParameters(br *bufio.Reader, s *MySQLStatement) os.Error {
 }
 
 func (sth *MySQLStatement) execute(va []interface{}) (*MySQLResponse, os.Error) {
-	if int(sth.Parameters) != len(va) {
+	if va == nil || int(sth.Parameters) != len(va) {
 		return nil, os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, len(va)))
 	}
 	type_parm, tn := encodeParamTypes(va)
