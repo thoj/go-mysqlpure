@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"os"
 	"fmt"
-	"bytes"
 	"strconv"
 )
 
@@ -27,11 +26,11 @@ func encodeParamValues(a []interface{}) ([]byte, int) {
 		f := a[i];
 		switch t := f.(type) {
 		case string:
-			b = bytes.Add(b, packString(string(t)))
+			b = append(b, packString(string(t))...)
 		case int:
-			b = bytes.Add(b, packString(strconv.Itoa(int(t))))
+			b = append(b, packString(strconv.Itoa(int(t)))...)
 		case float:
-			b = bytes.Add(b, packString(strconv.Ftoa(float(t), 'f', -1)))
+			b = append(b, packString(strconv.Ftoa(float(t), 'f', -1))...)
 		}
 	}
 	return b, len(b)

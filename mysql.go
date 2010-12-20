@@ -12,6 +12,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
+        "sync"
 )
 
 
@@ -36,6 +37,8 @@ type MySQLInstance struct {
 	database string
 	username string
 	password string
+
+        mutex *sync.Mutex
 }
 
 
@@ -54,13 +57,19 @@ func (mysql *MySQLInstance) readInit() os.Error {
 	mysql.ServerVersion, _ = mysql.reader.ReadString('\x00')
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ThreadId)
 	mysql.scrambleBuffer = make([]byte, 20)
-	mysql.reader.Read(mysql.scrambleBuffer[0:8])
+	err = readFull(mysql.reader, mysql.scrambleBuffer[0:8])
+        if err != nil {
+                return err
+        }
 	ignoreBytes(mysql.reader, 1)
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities)
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerLanguage)
 	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus)
 	ignoreBytes(mysql.reader, 13)
-	mysql.reader.Read(mysql.scrambleBuffer[8:20])
+	err = readFull(mysql.reader, mysql.scrambleBuffer[8:20])
+        if err != nil {
+                return err
+        }
 	ignoreBytes(mysql.reader, 1)
 	return nil
 }
@@ -140,7 +149,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.ServerStatus)
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount)
 		mBuf := make([]byte, mysql.reader.Buffered())
-		mysql.reader.Read(mBuf)
+		err = readFull(mysql.reader, mBuf)
 		response.Message = string(mBuf)
 
 	} else if response.FieldCount > 0x00 && response.FieldCount < 0xFB { //Result|Field|Row Data
@@ -253,6 +262,7 @@ func appendMap(slice, data []map[string]string) []map[string]string {
 func Connect(netstr string, laddrstr string, raddrstr string, username string, password string, database string) (*MySQLInstance, os.Error) {
 	var err os.Error
 	dbh := new(MySQLInstance)
+        dbh.mutex = new(sync.Mutex)
 	dbh.username = username
 	dbh.password = password
 	dbh.database = database
@@ -354,6 +364,9 @@ func (dbh *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	if dbh == nil {
 		panic("dbh object is undefined")
 	}
+        // For multithreading
+        dbh.mutex.Lock()
+        defer dbh.mutex.Unlock()
 
 	// Terrible hack to handle unfinished Queries.
 	if dbh.queryDone == false {

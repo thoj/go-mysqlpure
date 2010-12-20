@@ -10,19 +10,37 @@ import (
 	"os"
 	"fmt"
 	"crypto/sha1"
-	"bytes"
 )
+
+// Reads full slice or retutns error
+func readFull(rd *bufio.Reader, p []byte) os.Error {
+    for nn := 0; nn < len(p); {
+        kk, err := rd.Read(p[nn:])
+        /*if kk != len(p) {
+            fmt.Printf("DEBUG: readed %d/%d\n", kk, len(p))
+        }*/
+        if err != nil {
+            return err
+        }
+        nn += kk
+    }
+    return nil
+}
+
+func mustReadFull(rd *bufio.Reader, p []byte) {
+    err := readFull(rd, p)
+    if err != nil {
+        panic(err)
+    }
+}
 
 //Read mysql packet header
 func readHeader(br *bufio.Reader) (*PacketHeader, os.Error) {
 	ph := new(PacketHeader)
 	i24seq := make([]byte, 4)
-	nn, err := br.Read(i24seq)
+        err := readFull(br, i24seq)
 	if err != nil {
 		return nil, os.ErrorString(fmt.Sprintf("readHeader: %s", err))
-	}
-	if nn < 4 {
-		return nil, os.ErrorString(fmt.Sprintf("readHeader: Packet to small (%d)", nn))
 	}
 	ph.Len = unpackNumber(i24seq, 3)
 	ph.Seq = i24seq[3]
@@ -40,15 +58,15 @@ func unpackLength(br *bufio.Reader) (uint64, bool) {
 		return 0, true
 	} else if bl == 252 {
 		b := make([]byte, 2)
-		br.Read(b)
+		mustReadFull(br, b)
 		return unpackNumber(b, 2), false
 	} else if bl == 253 {
 		b := make([]byte, 3)
-		br.Read(b)
+		mustReadFull(br, b)
 		return unpackNumber(b, 3), false
 	} else if bl == 254 && br.Buffered() > 8 {
 		b := make([]byte, 8)
-		br.Read(b)
+		mustReadFull(br, b)
 		return unpackNumber(b, 8), false
 	}
 	return uint64(bl), false
@@ -95,7 +113,7 @@ func packUint64(bw *bufio.Writer, u uint64) os.Error {
 func unpackString(br *bufio.Reader) (string, bool) {
 	length, isnull := unpackLength(br)
 	b := make([]byte, length)
-	br.Read(b)
+	mustReadFull(br, b)
 	return string(b), isnull
 }
 
@@ -105,7 +123,7 @@ func packString(s string) []byte {
 	v := len(sb)
 	if v < 250 {
 		size[0] = uint8(v)
-		return bytes.Add(size, sb)
+		return append(size, sb...)
 	}
 	size = make([]byte, 9)
 	size[0] = 254
@@ -117,15 +135,17 @@ func packString(s string) []byte {
 	size[6] = byte(v >> 40)
 	size[7] = byte(v >> 48)
 	size[8] = byte(v >> 56)
-	return bytes.Add(size, sb)
+	return append(size, sb...)
 }
 
 //Peek and check if packet is EOF
 func peekEOF(br *bufio.Reader) bool {
-	b := make([]byte, 1)
-	br.Read(b)
+	b, err := br.ReadByte()
+        if err != nil {
+                panic(err)
+        }
 	br.UnreadByte()
-	if b[0] == 0xfe {
+	if b == 0xfe {
 		return true
 	}
 	return false
@@ -169,9 +189,15 @@ func readErrorPacket(br *bufio.Reader) os.Error {
 	var errcode uint16
 	binary.Read(br, binary.LittleEndian, &errcode)
 	status := make([]byte, 6)
-	br.Read(status)
+	err := readFull(br, status)
+        if err != nil {
+            return err
+        }
 	msg := make([]byte, br.Buffered())
-	br.Read(msg)
+	err = readFull(br, msg)
+        if err != nil {
+            return err
+        }
 	return os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), string(msg)))
 }
 
@@ -193,7 +219,7 @@ func readEOFPacket(br *bufio.Reader) os.Error {
 //Ignores n bytes in the buffer
 func ignoreBytes(br *bufio.Reader, n uint64) {
 	buf := make([]byte, n)
-	br.Read(buf)
+	mustReadFull(br, buf)
 }
 
 //Generate scrabled password using password and scramble buffer.
