@@ -59,39 +59,43 @@ func encodeParamTypes(a []interface{}) ([]byte, int) {
 }
 
 
-func readPrepareInit(br *bufio.Reader) (*MySQLStatement, os.Error) {
-	ph, err := readHeader(br)
-	if err != nil {
-		return nil, err
-	}
-	s := new(MySQLStatement)
+func readPrepareInit(br *bufio.Reader) (s *MySQLStatement, err os.Error) {
+	var ph *PacketHeader
+	ph, err = readHeader(br)
+	if err != nil { return }
+	s = new(MySQLStatement)
 	err = binary.Read(br, binary.LittleEndian, &s.FieldCount)
+	if err != nil { return }
 	if s.FieldCount == uint8(0xff) {
-		return nil, readErrorPacket(br)
+		return nil, readErrorPacket(br, int(ph.Len))
 	}
 	err = binary.Read(br, binary.LittleEndian, &s.StatementId)
+	if err != nil { return }
 	err = binary.Read(br, binary.LittleEndian, &s.Columns)
+	if err != nil { return }
 	err = binary.Read(br, binary.LittleEndian, &s.Parameters)
+	if err != nil { return }
 	if ph.Len >= 12 {
-		ignoreBytes(br, 1)
+		err = ignoreBytes(br, 1)
+		if err != nil { return }
 		err = binary.Read(br, binary.LittleEndian, &s.Warnings)
+		if err != nil { return }
 	}
-	return s, err
+	return
 }
 
 //Currently just skips the pakets as I'm not sure if they are useful.
 func readPrepareParameters(br *bufio.Reader, s *MySQLStatement) os.Error {
 	for i := uint16(0); i < s.Parameters; i++ {
 		ph, err := readHeader(br)
-		if err != nil {
-			return err
-		}
-		ignoreBytes(br, ph.Len)
+		if err != nil { return err }
+		err = ignoreBytes(br, ph.Len)
+		if err != nil { return err }
 	}
 	return nil
 }
 
-func (sth *MySQLStatement) execute(va []interface{}) (*MySQLResponse, os.Error) {
+func (sth *MySQLStatement) execute(va []interface{}) (res *MySQLResponse, err os.Error) {
 	if va == nil || int(sth.Parameters) != len(va) {
 		return nil, os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, len(va)))
 	}
@@ -99,24 +103,36 @@ func (sth *MySQLStatement) execute(va []interface{}) (*MySQLResponse, os.Error) 
 	value_parm, vn := encodeParamValues(va)
 	bitmap_len := (len(va) + 7) / 8
 	mysql := sth.mysql
-	packUint24(mysql.writer, uint32(11+bitmap_len+tn+vn))
-	packUint8(mysql.writer, uint8(0))
-	packUint8(mysql.writer, uint8(COM_STMT_EXECUTE))
-	packUint32(mysql.writer, uint32(sth.StatementId))
-	packUint8(mysql.writer, uint8(0))
-	packUint32(mysql.writer, uint32(1))
+	err = packUint24(mysql.writer, uint32(11+bitmap_len+tn+vn))
+	if err != nil { return }
+	err = packUint8(mysql.writer, uint8(0))
+	if err != nil { return }
+	err = packUint8(mysql.writer, uint8(COM_STMT_EXECUTE))
+	if err != nil { return }
+	err = packUint32(mysql.writer, uint32(sth.StatementId))
+	if err != nil { return }
+	err = packUint8(mysql.writer, uint8(0))
+	if err != nil { return }
+	err = packUint32(mysql.writer, uint32(1))
+	if err != nil { return }
 	b := make([]byte, bitmap_len)
-	mysql.writer.Write(b) //TODO: Support null params.
-	packUint8(mysql.writer, uint8(1))
-	mysql.writer.Write(type_parm)
-	mysql.writer.Write(value_parm)
-	mysql.writer.Flush()
-	res, err := mysql.readResult()
+	_, err = mysql.writer.Write(b) //TODO: Support null params.
+	if err != nil { return }
+	err = packUint8(mysql.writer, uint8(1))
+	if err != nil { return }
+	_, err = mysql.writer.Write(type_parm)
+	if err != nil { return }
+	_, err = mysql.writer.Write(value_parm)
+	if err != nil { return }
+	err = mysql.writer.Flush()
+	if err != nil { return }
+	res, err = mysql.readResult()
+	if err != nil { return }
 	res.Prepared = true
-	return res, err
+	return
 }
 
-func (mysql *MySQLInstance) prepare(arg string) (*MySQLStatement, os.Error) {
+func (mysql *MySQLInstance) prepare(arg string) (sth *MySQLStatement, err os.Error) {
 	plen := len(arg) + 1
 	head := make([]byte,5)
 	head[0] = byte(plen)
@@ -124,25 +140,25 @@ func (mysql *MySQLInstance) prepare(arg string) (*MySQLStatement, os.Error) {
 	head[2] = byte(plen >> 16)
 	head[3] = 0
 	head[4] = uint8(COM_STMT_PREPARE)
-	_, err := mysql.writer.Write(head)
+	_, err = mysql.writer.Write(head)
+	if err != nil { return }
 	_, err = mysql.writer.WriteString(arg)
+	if err != nil { return }
 	err = mysql.writer.Flush()
-	if err != nil {
-		fmt.Printf("%s\n", err)
-		return nil, err
-	}
-	sth, err := readPrepareInit(mysql.reader)
-	if err != nil {
-		return nil, err
-	}
+	if err != nil { return }
+	sth, err = readPrepareInit(mysql.reader)
+	if err != nil { return }
 	if sth.Parameters > 0 {
-		readPrepareParameters(mysql.reader, sth)
-		readEOFPacket(mysql.reader)
+		err = readPrepareParameters(mysql.reader, sth)
+		if err != nil { return }
+		err = readEOFPacket(mysql.reader)
+		if err != nil { return }
 	}
 	if sth.Columns > 0 {
-		rs, _ := mysql.readResultSet(uint64(sth.Columns))
+		rs, err := mysql.readResultSet(uint64(sth.Columns))
+		if err != nil { return nil, err }
 		sth.ResultSet = rs
 	}
 	sth.mysql = mysql
-	return sth, nil
+	return
 }

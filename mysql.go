@@ -53,53 +53,62 @@ func (mysql *MySQLInstance) readInit() os.Error {
 		// Initial packet must be Seq == 0
 		return os.ErrorString("Unexpected Sequence Number")
 	}
-	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ProtocolVersion)
-	mysql.ServerVersion, _ = mysql.reader.ReadString('\x00')
-	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ThreadId)
+	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ProtocolVersion)
+	if err != nil { return err }
+	mysql.ServerVersion, err = mysql.reader.ReadString('\x00')
+	if err != nil { return err }
+	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ThreadId)
+	if err != nil { return err }
 	mysql.scrambleBuffer = make([]byte, 20)
 	err = readFull(mysql.reader, mysql.scrambleBuffer[0:8])
-        if err != nil {
-                return err
-        }
-	ignoreBytes(mysql.reader, 1)
-	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities)
-	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerLanguage)
-	binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus)
-	ignoreBytes(mysql.reader, 13)
+        if err != nil { return err }
+	err = ignoreBytes(mysql.reader, 1)
+        if err != nil { return err }
+	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities)
+	if err != nil { return err }
+	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerLanguage)
+	if err != nil { return err }
+	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus)
+	if err != nil { return err }
+	err = ignoreBytes(mysql.reader, 13)
+	if err != nil { return err }
 	err = readFull(mysql.reader, mysql.scrambleBuffer[8:20])
-        if err != nil {
-                return err
-        }
-	ignoreBytes(mysql.reader, 1)
-	return nil
+        if err != nil { return err }
+	err = ignoreBytes(mysql.reader, 1)
+	return err
 }
 
 
-func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (*MySQLRow, os.Error) {
-	ph, err := readHeader(br)
-	if err != nil {
-		return nil, err
-	}
-	row := new(MySQLRow)
-
-	if peekEOF(br) || res.ResultSet == nil { //FIXME: Ignoring EOF and return nil is a bit hackish.
-		ignoreBytes(br, ph.Len)
+func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (row *MySQLRow, err os.Error) {
+	var (
+		ph *PacketHeader
+		eof bool
+	)
+	ph, err = readHeader(br)
+	if err != nil { return }
+	row = new(MySQLRow)
+	eof, err = peekEOF(br)
+	if err != nil { return }
+	if eof || res.ResultSet == nil { //FIXME: Ignoring EOF and return nil is a bit hackish.
+		err = ignoreBytes(br, ph.Len)
 		return nil, err
 	}
 	row.Data = make([]*MySQLData, res.ResultSet.FieldCount)
 	if res.Prepared {
 		//TODO: Do this right.
-		ignoreBytes(br, uint64(res.ResultSet.FieldCount+9)/8+1)
+		err = ignoreBytes(br, uint64(res.ResultSet.FieldCount+9)/8+1)
+		if err != nil { return }
 	}
 	for i := uint64(0); i < res.ResultSet.FieldCount; i++ {
 		data := new(MySQLData)
 		var s string
 		var isnull bool
 		if res.Prepared {
-			s, isnull = readFieldData(br, res.ResultSet.Fields[i])
+			s, isnull, err = readFieldData(br, res.ResultSet.Fields[i])
 		} else {
-			s, isnull = unpackString(br)
+			s, isnull, err = unpackString(br)
 		}
+		if err != nil { return }
 		data.IsNull = isnull
 		data.Data = s
 		data.Length = uint64(len(s))
@@ -113,13 +122,22 @@ func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, o
 	rs := new(MySQLResultSet)
 	rs.FieldCount = fieldCount
 	rs.Fields = make([]*MySQLField, rs.FieldCount)
-	var i uint64
+	var (
+		i uint64
+		err os.Error
+	)
 	for i = 0; i < rs.FieldCount; i++ {
-		readHeader(mysql.reader)
-		rs.Fields[i] = readFieldPacket(mysql.reader)
+		_, err = readHeader(mysql.reader)
+		if err != nil {
+			return nil, err
+		}
+		rs.Fields[i], err = readFieldPacket(mysql.reader)
+		if err != nil {
+			return nil, err
+		}
 	}
-	readEOFPacket(mysql.reader)
-	return rs, nil
+	err = readEOFPacket(mysql.reader)
+	return rs, err
 }
 
 //Tries to read OK result error on error packet
@@ -135,25 +153,46 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	}
 	response := new(MySQLResponse)
 	response.EOF = false
-	response.FieldCount, _ = unpackFieldCount(mysql.reader)
+	response.FieldCount, _, err = unpackFieldCount(mysql.reader)
+	if err != nil {
+		return nil, err
+	}
 	response.mysql = mysql
 
 	if response.FieldCount == 0xff { // ERROR
-		return nil, readErrorPacket(mysql.reader)
+		return nil, readErrorPacket(mysql.reader, int(ph.Len))
 
 	} else if response.FieldCount == 0x00 { // OK
-		eb, _ := unpackLength(mysql.reader)
+		msg_len := int(ph.Len - 1)
+		eb, _, num, err := unpackLength(mysql.reader)
+		if err != nil {
+			return nil, err
+		}
 		response.AffectedRows = eb
-		eb, _ = unpackLength(mysql.reader)
+		msg_len -= num
+		eb, _, num, err = unpackLength(mysql.reader)
+		if err != nil {
+			return nil, err
+		}
 		response.InsertId = eb
+		msg_len -= num
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.ServerStatus)
+		if err != nil {
+			return nil, err
+		}
 		err = binary.Read(mysql.reader, binary.LittleEndian, &response.WarningCount)
-		mBuf := make([]byte, mysql.reader.Buffered())
+		if err != nil {
+			return nil, err
+		}
+		msg_len -= 4
+		mBuf := make([]byte, msg_len)
 		err = readFull(mysql.reader, mBuf)
+                if err != nil {
+			return nil, err
+		}
 		response.Message = string(mBuf)
-
 	} else if response.FieldCount > 0x00 && response.FieldCount < 0xFB { //Result|Field|Row Data
-		rs, _ := mysql.readResultSet(uint64(response.FieldCount))
+		rs, err := mysql.readResultSet(uint64(response.FieldCount))
 		response.ResultSet = rs
 		return response, err
 
@@ -217,24 +256,31 @@ func (dbh *MySQLInstance) sendAuth() os.Error {
 	binary.LittleEndian.PutUint32(head[4:8], uint32(clientFlags))
 	binary.LittleEndian.PutUint32(head[8:12], uint32(MAX_PACKET_SIZE))
 	head[12] = dbh.ServerLanguage
-	dbh.writer.Write(head)
+	_, err := dbh.writer.Write(head)
+	if err != nil { return err }
 	filler := make([]byte, 23)
-	dbh.writer.Write(filler)
-	dbh.writer.WriteString(dbh.username)
-	dbh.writer.Write(filler[0:1])
+	_, err = dbh.writer.Write(filler)
+	if err != nil { return err }
+	_, err = dbh.writer.WriteString(dbh.username)
+	if err != nil { return err }
+	_, err = dbh.writer.Write(filler[0:1])
+	if err != nil { return err }
 	if len(dbh.password) > 0 {
 		token := mysqlPassword([]byte(dbh.password), dbh.scrambleBuffer)
-		dbh.writer.Write(token)
+		_, err = dbh.writer.Write(token)
 	} else {
-		dbh.writer.Write(filler[0:1])
+		_, err = dbh.writer.Write(filler[0:1])
 	}
+	if err != nil { return err }
 	if len(dbh.database) > 0 {
-		dbh.writer.WriteString(dbh.database)
-		dbh.writer.Write(filler[0:1])
+		_, err = dbh.writer.WriteString(dbh.database)
+		if err != nil { return err }
+		_, err = dbh.writer.Write(filler[0:1])
+		if err != nil { return err }
 	}
-	dbh.writer.Flush()
+	err = dbh.writer.Flush()
 
-	return nil
+	return err
 
 }
 //Stolen from http://golang.org/doc/effective_go.html#slices
