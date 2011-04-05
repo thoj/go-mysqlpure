@@ -6,7 +6,7 @@ import (
 )
 
 func MakeDbh(t *testing.T) *MySQLInstance {
-	dbh, err := Connect("tcp", "", "127.0.0.1:3306", "test", "test", "test")
+	dbh, err := Connect("tcp", "127.0.0.1:3306", "test", "test", "test")
 	if err != nil {
 		t.Error(err)
 		t.FailNow()
@@ -49,7 +49,11 @@ func SelectSingleRowPrepared(t *testing.T, q string, p ...interface{}) map[strin
 		t.Error(err)
 		t.FailNow()
 	}
-	res, err = sth.Execute(p)
+	res, err = sth.Execute(p...)
+	if err != nil || res == nil {
+		t.Error(err)
+		t.FailNow()
+	}
 	row := res.FetchRowMap()
 	dbh.Quit()
 	return row
@@ -58,18 +62,18 @@ func SelectSingleRowPrepared(t *testing.T, q string, p ...interface{}) map[strin
 
 func TestLongRun(t *testing.T) {
 	dbh := MakeDbh(t)
-	for i := 0; i < 100000; i++ {
+	for i := 0; i < 10000; i++ {
 		res := CheckQuery(t, dbh, fmt.Sprintf("INSERT INTO test2 (test, testtest) VALUES(%d, %d)", i, i%10))
 		if res.InsertId < 1 {
 			t.Error("InsertId < 0")
 			t.FailNow()
 		}
-		if i%10000 == 0 {
-			fmt.Printf("%d%%\n", i/1000)
+		if i%1000 == 0 {
+			fmt.Printf("%d%%\n", i/100)
 		}
 	}
 	res := CheckQuery(t, dbh, "DELETE FROM test2")
-	if res.AffectedRows != 100000 {
+	if res.AffectedRows != 10000 {
 		t.Error("AffectedRows = ", res.AffectedRows)
 		t.FailNow()
 	}
@@ -91,6 +95,14 @@ func TestUnfinished(t *testing.T) {
 
 func TestSelectString(t *testing.T) {
 	row := SelectSingleRow(t, "SELECT * FROM test WHERE name='test1'")
+	test := "1234567890abcdef"
+	if row == nil || row["stuff"] != test {
+		t.Error(row["stuff"], " != ", test)
+	}
+}
+
+func TestSelectStringPrepared2(t *testing.T) {
+	row := SelectSingleRowPrepared(t, "SELECT * FROM test WHERE name=? OR name=?", "test1", "testnonexisting")
 	test := "1234567890abcdef"
 	if row == nil || row["stuff"] != test {
 		t.Error(row["stuff"], " != ", test)
