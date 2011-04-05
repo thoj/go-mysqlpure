@@ -304,15 +304,15 @@ func appendMap(slice, data []map[string]string) []map[string]string {
 
 //Connects to mysql server and reads the initial handshake,
 //then tries to login using supplied credentials.
-//The first 3 parameters are passed directly to Dial
-func Connect(netstr string, laddrstr string, raddrstr string, username string, password string, database string) (*MySQLInstance, os.Error) {
+//The first 2 parameters are passed directly to Dial
+func Connect(netstr string, raddrstr string, username string, password string, database string) (*MySQLInstance, os.Error) {
 	var err os.Error
 	dbh := new(MySQLInstance)
         dbh.mutex = new(sync.Mutex)
 	dbh.username = username
 	dbh.password = password
 	dbh.database = database
-	dbh.connection, err = net.Dial(netstr, laddrstr, raddrstr)
+	dbh.connection, err = net.Dial(netstr, raddrstr)
 	if err != nil {
 		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", raddrstr))
 	}
@@ -428,6 +428,6 @@ func (dbh *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	return response, err
 }
 
-func (sth *MySQLStatement) Execute(va ...interface{}) (*MySQLResponse, os.Error) {
-	return sth.execute(va)
+func (sth *MySQLStatement) Execute(a ...interface{}) (*MySQLResponse, os.Error) {
+	return sth.execute(a)
 }

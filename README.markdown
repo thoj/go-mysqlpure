@@ -22,8 +22,8 @@ Install
 
 Use
 --------------
-Three first parameters are passed to Dial. Unix socket: net = unix, raddr = path to mysql.sock  
-> dbh, error = mysql.Connect(net, laddr, raddr, username, password, database)
+Three first 2 parameters are passed to Dial. Unix socket: net = unix, raddr = path to mysql.sock  
+> dbh, error = mysql.Connect(net, raddr, username, password, database)
 
 Select database  
 > res, err = dbh.Use(database)

@@ -97,13 +97,13 @@ func readPrepareParameters(br *bufio.Reader, s *MySQLStatement) os.Error {
 	return nil
 }
 
-func (sth *MySQLStatement) execute(va []interface{}) (res *MySQLResponse, err os.Error) {
-	if va == nil || int(sth.Parameters) != len(va) {
-		return nil, os.ErrorString(fmt.Sprintf("Parameter count mismatch. %d != %d", sth.Parameters, len(va)))
+func (sth *MySQLStatement) execute(a []interface{}) (res *MySQLResponse, err os.Error) {
+	if a == nil || int(sth.Parameters) != len(a) {
+		return nil, os.ErrorString(fmt.Sprintf("Parameter count mismatch. Expected %d parameters, got %d", sth.Parameters, len(a)))
 	}
-	type_parm, tn := encodeParamTypes(va)
-	value_parm, vn := encodeParamValues(va)
-	bitmap_len := (len(va) + 7) / 8
+	type_parm, tn := encodeParamTypes(a)
+	value_parm, vn := encodeParamValues(a)
+	bitmap_len := (len(a) + 7) / 8
 	mysql := sth.mysql
 	err = packUint24(mysql.writer, uint32(11+bitmap_len+tn+vn))
 	if err != nil { return }
