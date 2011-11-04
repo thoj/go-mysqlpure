@@ -5,35 +5,35 @@
 package mysql
 
 import (
-	"encoding/binary"
 	"bufio"
-	"os"
-	"fmt"
 	"crypto/sha1"
+	"encoding/binary"
+	"errors"
+	"fmt"
 )
 
 // Reads full slice or retutns error
-func readFull(rd *bufio.Reader, p []byte) os.Error {
-    for nn := 0; nn < len(p); {
-        kk, err := rd.Read(p[nn:])
-        /*if kk != len(p) {
-            fmt.Printf("DEBUG: readed %d/%d\n", kk, len(p))
-        }*/
-        if err != nil {
-            return err
-        }
-        nn += kk
-    }
-    return nil
+func readFull(rd *bufio.Reader, p []byte) error {
+	for nn := 0; nn < len(p); {
+		kk, err := rd.Read(p[nn:])
+		/*if kk != len(p) {
+		    fmt.Printf("DEBUG: readed %d/%d\n", kk, len(p))
+		}*/
+		if err != nil {
+			return err
+		}
+		nn += kk
+	}
+	return nil
 }
 
 //Read mysql packet header
-func readHeader(br *bufio.Reader) (*PacketHeader, os.Error) {
+func readHeader(br *bufio.Reader) (*PacketHeader, error) {
 	ph := new(PacketHeader)
 	i24seq := make([]byte, 4)
 	err := readFull(br, i24seq)
 	if err != nil {
-		return nil, os.ErrorString(fmt.Sprintf("readHeader: %s", err))
+		return nil, errors.New(fmt.Sprintf("readHeader: %s", err))
 	}
 	ph.Len = unpackNumber(i24seq, 3)
 	ph.Seq = i24seq[3]
@@ -41,38 +41,38 @@ func readHeader(br *bufio.Reader) (*PacketHeader, os.Error) {
 }
 
 //Decode length encoded number
-func unpackLength(br *bufio.Reader) (val uint64, null bool, num int, err os.Error) {
+func unpackLength(br *bufio.Reader) (val uint64, null bool, num int, err error) {
 	var bl uint8
 	err = binary.Read(br, binary.LittleEndian, &bl)
 	if err != nil {
-            return
-        }
-        num = 1
+		return
+	}
+	num = 1
 	if bl == 251 {
-                null = true
+		null = true
 	} else if bl == 252 {
 		b := make([]byte, 2)
-                num += 2
+		num += 2
 		err = readFull(br, b)
-                val = unpackNumber(b, 2)
+		val = unpackNumber(b, 2)
 	} else if bl == 253 {
 		b := make([]byte, 3)
-                num += 3
+		num += 3
 		err = readFull(br, b)
-                val = unpackNumber(b, 3)
+		val = unpackNumber(b, 3)
 	} else if bl == 254 {
 		b := make([]byte, 8)
-                num += 8
+		num += 8
 		err = readFull(br, b)
 		val = unpackNumber(b, 8)
 	} else {
 		val = uint64(bl)
-        }
+	}
 	return
 }
 
 //Special case of unpackLength where 0xfe == EOF
-func unpackFieldCount(br *bufio.Reader) (val uint64, null bool, err os.Error) {
+func unpackFieldCount(br *bufio.Reader) (val uint64, null bool, err error) {
 	var eof bool
 	eof, err = peekEOF(br)
 	if err != nil {
@@ -87,15 +87,15 @@ func unpackFieldCount(br *bufio.Reader) (val uint64, null bool, err os.Error) {
 	return
 }
 
-func packUint8(bw *bufio.Writer, u uint8) os.Error {
+func packUint8(bw *bufio.Writer, u uint8) error {
 	return binary.Write(bw, binary.LittleEndian, u)
 }
 
-func packUint16(bw *bufio.Writer, u uint16) os.Error {
+func packUint16(bw *bufio.Writer, u uint16) error {
 	return binary.Write(bw, binary.LittleEndian, u)
 }
 
-func packUint24(bw *bufio.Writer, u uint32) os.Error {
+func packUint24(bw *bufio.Writer, u uint32) error {
 	b := make([]byte, 3)
 	b[0] = byte(u)
 	b[1] = byte(u >> 8)
@@ -107,16 +107,16 @@ func packUint24(bw *bufio.Writer, u uint32) os.Error {
 	return nil
 }
 
-func packUint32(bw *bufio.Writer, u uint32) os.Error {
+func packUint32(bw *bufio.Writer, u uint32) error {
 	return binary.Write(bw, binary.LittleEndian, u)
 }
 
-func packUint64(bw *bufio.Writer, u uint64) os.Error {
+func packUint64(bw *bufio.Writer, u uint64) error {
 	return binary.Write(bw, binary.LittleEndian, u)
 }
 
 //Decode length encoded string
-func unpackString(br *bufio.Reader) (string, bool, os.Error) {
+func unpackString(br *bufio.Reader) (string, bool, error) {
 	length, isnull, _, err := unpackLength(br)
 	if err != nil {
 		return "", false, err
@@ -148,7 +148,7 @@ func packString(s string) []byte {
 }
 
 //Peek and check if packet is EOF
-func peekEOF(br *bufio.Reader) (bool, os.Error) {
+func peekEOF(br *bufio.Reader) (bool, error) {
 	b, err := br.ReadByte()
 	if err != nil {
 		return false, err
@@ -173,40 +173,66 @@ func unpackNumber(b []byte, n uint8) uint64 {
 }
 
 //Read the field data from mysql ResultSet packet
-func readFieldPacket(br *bufio.Reader) (f *MySQLField, err os.Error) {
+func readFieldPacket(br *bufio.Reader) (f *MySQLField, err error) {
 	f = new(MySQLField)
 	f.Catalog, _, err = unpackString(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	f.Db, _, err = unpackString(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	f.Table, _, err = unpackString(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	f.OrgTable, _, err = unpackString(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	f.Name, _, err = unpackString(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	f.OrgName, _, err = unpackString(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = ignoreBytes(br, 1)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &f.Charset)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &f.Length)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &f.Type)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &f.Flags)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &f.Decimals)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = ignoreBytes(br, 1)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	f.Default, _, _, err = unpackLength(br)
 	return
 }
 
 //Read error packet
-func readErrorPacket(br *bufio.Reader, pkt_len int) os.Error {
+func readErrorPacket(br *bufio.Reader, pkt_len int) error {
 	var errcode uint16
 	err := binary.Read(br, binary.LittleEndian, &errcode)
 	if err != nil {
@@ -217,39 +243,45 @@ func readErrorPacket(br *bufio.Reader, pkt_len int) os.Error {
 	if err != nil {
 		return err
 	}
-	msg := make([]byte, pkt_len - 9)
+	msg := make([]byte, pkt_len-9)
 	err = readFull(br, msg)
 	if err != nil {
 		return err
 	}
-	return os.ErrorString(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), string(msg)))
+	return errors.New(fmt.Sprintf("MySQL Error: (Code: %d) (Status: %s) %s", errcode, string(status), string(msg)))
 }
 
 //Read EOF packet.
 //TODO: Return something useful?
-func readEOFPacket(br *bufio.Reader) (err os.Error) {
+func readEOFPacket(br *bufio.Reader) (err error) {
 	_, err = readHeader(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	response := new(MySQLResponse)
 	response.FieldCount, _, err = unpackFieldCount(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	if response.FieldCount != 0xfe {
 		fmt.Printf("Warning: Expected EOF! Got %#v\n", response.FieldCount)
 	}
 	err = binary.Read(br, binary.LittleEndian, &response.WarningCount)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &response.ServerStatus)
 	return
 }
 
 //Ignores n bytes in the buffer
-func ignoreBytes(br *bufio.Reader, n uint64) os.Error {
+func ignoreBytes(br *bufio.Reader, n uint64) error {
 	buf := make([]byte, n)
 	return readFull(br, buf)
 }
 
 //Generate scrabled password using password and scramble buffer.
-func mysqlPassword(password []byte, scrambleBuffer []byte) ([]byte) {
+func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 	ctx := sha1.New()
 	ctx.Write(password)
 	stage1 := ctx.Sum()

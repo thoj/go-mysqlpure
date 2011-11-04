@@ -1,12 +1,11 @@
 package mysql
 
 import (
-	"fmt"
-	"encoding/binary"
 	"bufio"
-	"time"
-	"os"
+	"encoding/binary"
+	"fmt"
 	"log"
+	"time"
 )
 
 type PacketHeader struct {
@@ -33,7 +32,6 @@ type MySQLResponse struct {
 	ResultSet *MySQLResultSet
 	mysql     *MySQLInstance
 }
-
 
 func (s *MySQLStatement) String() string {
 	return fmt.Sprintf("Statement Id = %d, Columns = %d, Parameters = %d", s.StatementId, s.Columns, s.Parameters)
@@ -68,7 +66,7 @@ func (r *MySQLResponse) String() string {
 }
 
 // This is terrible should return a interface or something instead of converting to strings.
-func readFieldData(br *bufio.Reader, f *MySQLField) (string, bool, os.Error) {
+func readFieldData(br *bufio.Reader, f *MySQLField) (string, bool, error) {
 	switch f.Type {
 	case MYSQL_TYPE_TINY:
 		var l int8
@@ -114,18 +112,26 @@ func readFieldData(br *bufio.Reader, f *MySQLField) (string, bool, os.Error) {
 	return "NULL", true, nil
 }
 
-func unpackDate(br *bufio.Reader) (dt *time.Time, err os.Error) {
+func unpackDate(br *bufio.Reader) (dt *time.Time, err error) {
 	dt = new(time.Time)
 	var y uint16
 	var M, d, n uint8
 	err = binary.Read(br, binary.LittleEndian, &n)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &y)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &M)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &d)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	dt.Year = int64(y)
 	dt.Month = int(M)
 	dt.Day = int(d)
@@ -134,17 +140,25 @@ func unpackDate(br *bufio.Reader) (dt *time.Time, err os.Error) {
 	dt.Second = 0
 	return
 }
-func unpackTime(br *bufio.Reader) (dt *time.Time, err os.Error) {
+func unpackTime(br *bufio.Reader) (dt *time.Time, err error) {
 	dt = new(time.Time)
 	var h, m, s uint8
 	err = ignoreBytes(br, 6)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &h)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &m)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &s)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	dt.Year = 0
 	dt.Month = 0
 	dt.Day = 0
@@ -153,24 +167,38 @@ func unpackTime(br *bufio.Reader) (dt *time.Time, err os.Error) {
 	dt.Second = int(s)
 	return
 }
-func unpackDateTime(br *bufio.Reader) (dt *time.Time, err os.Error) {
+func unpackDateTime(br *bufio.Reader) (dt *time.Time, err error) {
 	dt = new(time.Time)
 	var y uint16
 	var M, d, h, m, s, n uint8
 	err = binary.Read(br, binary.LittleEndian, &n)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &y)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &M)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &d)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &h)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &m)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	err = binary.Read(br, binary.LittleEndian, &s)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	dt.Year = int64(y)
 	dt.Month = int(M)
 	dt.Day = int(d)
@@ -179,7 +207,6 @@ func unpackDateTime(br *bufio.Reader) (dt *time.Time, err os.Error) {
 	dt.Second = int(s)
 	return
 }
-
 
 type MySQLField struct {
 	Catalog  string

@@ -7,14 +7,13 @@
 package mysql
 
 import (
-	"net"
-	"os"
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"fmt"
-        "sync"
+	"net"
+	"sync"
 )
-
 
 type MySQLInstance struct {
 	ProtocolVersion    uint8  // Protocol version = 0x10
@@ -38,12 +37,11 @@ type MySQLInstance struct {
 	username string
 	password string
 
-        mutex *sync.Mutex
+	mutex *sync.Mutex
 }
 
-
 //Read initial handshake packet.
-func (mysql *MySQLInstance) readInit() os.Error {
+func (mysql *MySQLInstance) readInit() error {
 	ph, err := readHeader(mysql.reader)
 	if err != nil {
 		return err
@@ -51,44 +49,67 @@ func (mysql *MySQLInstance) readInit() os.Error {
 
 	if ph.Seq != 0 {
 		// Initial packet must be Seq == 0
-		return os.ErrorString("Unexpected Sequence Number")
+		return errors.New("Unexpected Sequence Number")
 	}
 	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ProtocolVersion)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	mysql.ServerVersion, err = mysql.reader.ReadString('\x00')
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ThreadId)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	mysql.scrambleBuffer = make([]byte, 20)
 	err = readFull(mysql.reader, mysql.scrambleBuffer[0:8])
-        if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = ignoreBytes(mysql.reader, 1)
-        if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerCapabilities)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerLanguage)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = binary.Read(mysql.reader, binary.LittleEndian, &mysql.ServerStatus)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = ignoreBytes(mysql.reader, 13)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = readFull(mysql.reader, mysql.scrambleBuffer[8:20])
-        if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	err = ignoreBytes(mysql.reader, 1)
 	return err
 }
 
-
-func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (row *MySQLRow, err os.Error) {
+func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (row *MySQLRow, err error) {
 	var (
-		ph *PacketHeader
+		ph  *PacketHeader
 		eof bool
 	)
 	ph, err = readHeader(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	row = new(MySQLRow)
 	eof, err = peekEOF(br)
-	if err != nil { return }
+	if err != nil {
+		return
+	}
 	if eof || res.ResultSet == nil { //FIXME: Ignoring EOF and return nil is a bit hackish.
 		err = ignoreBytes(br, ph.Len)
 		return nil, err
@@ -97,7 +118,9 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (row *MySQLRow, err os
 	if res.Prepared {
 		//TODO: Do this right.
 		err = ignoreBytes(br, uint64(res.ResultSet.FieldCount+9)/8+1)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 	}
 	for i := uint64(0); i < res.ResultSet.FieldCount; i++ {
 		data := new(MySQLData)
@@ -108,7 +131,9 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (row *MySQLRow, err os
 		} else {
 			s, isnull, err = unpackString(br)
 		}
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		data.IsNull = isnull
 		data.Data = s
 		data.Length = uint64(len(s))
@@ -118,13 +143,13 @@ func (res *MySQLResponse) readRowPacket(br *bufio.Reader) (row *MySQLRow, err os
 	return row, err
 }
 
-func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, os.Error) {
+func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, error) {
 	rs := new(MySQLResultSet)
 	rs.FieldCount = fieldCount
 	rs.Fields = make([]*MySQLField, rs.FieldCount)
 	var (
-		i uint64
-		err os.Error
+		i   uint64
+		err error
 	)
 	for i = 0; i < rs.FieldCount; i++ {
 		_, err = readHeader(mysql.reader)
@@ -141,13 +166,13 @@ func (mysql *MySQLInstance) readResultSet(fieldCount uint64) (*MySQLResultSet, o
 }
 
 //Tries to read OK result error on error packet
-func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
+func (mysql *MySQLInstance) readResult() (*MySQLResponse, error) {
 	if mysql == nil {
 		panic("mysql undefined")
 	}
 	ph, err := readHeader(mysql.reader)
 	if err != nil {
-		return nil, os.ErrorString(fmt.Sprintf("readHeader error: %s", err))
+		return nil, errors.New(fmt.Sprintf("readHeader error: %s", err))
 	} else if ph.Len < 1 {
 		// Junk?
 	}
@@ -187,7 +212,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 		msg_len -= 4
 		mBuf := make([]byte, msg_len)
 		err = readFull(mysql.reader, mBuf)
-                if err != nil {
+		if err != nil {
 			return nil, err
 		}
 		response.Message = string(mBuf)
@@ -209,7 +234,7 @@ func (mysql *MySQLInstance) readResult() (*MySQLResponse, os.Error) {
 	return response, nil
 }
 
-func (dbh *MySQLInstance) mysqlCommand(command MySQLCommand, arg string) (*MySQLResponse, os.Error) {
+func (dbh *MySQLInstance) mysqlCommand(command MySQLCommand, arg string) (*MySQLResponse, error) {
 	plen := len(arg) + 1
 	head := make([]byte, 5)
 	head[0] = byte(plen)
@@ -230,9 +255,8 @@ func (dbh *MySQLInstance) mysqlCommand(command MySQLCommand, arg string) (*MySQL
 	return dbh.readResult()
 }
 
-
 // Auth using the MySQL secure auth
-func (dbh *MySQLInstance) sendAuth() os.Error {
+func (dbh *MySQLInstance) sendAuth() error {
 	var clientFlags ClientFlags = CLIENT_LONG_PASSWORD
 	clientFlags += CLIENT_PROTOCOL_41
 	clientFlags += CLIENT_SECURE_CONNECTION
@@ -257,26 +281,40 @@ func (dbh *MySQLInstance) sendAuth() os.Error {
 	binary.LittleEndian.PutUint32(head[8:12], uint32(MAX_PACKET_SIZE))
 	head[12] = dbh.ServerLanguage
 	_, err := dbh.writer.Write(head)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	filler := make([]byte, 23)
 	_, err = dbh.writer.Write(filler)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = dbh.writer.WriteString(dbh.username)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	_, err = dbh.writer.Write(filler[0:1])
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if len(dbh.password) > 0 {
 		token := mysqlPassword([]byte(dbh.password), dbh.scrambleBuffer)
 		_, err = dbh.writer.Write(token)
 	} else {
 		_, err = dbh.writer.Write(filler[0:1])
 	}
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if len(dbh.database) > 0 {
 		_, err = dbh.writer.WriteString(dbh.database)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		_, err = dbh.writer.Write(filler[0:1])
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 	err = dbh.writer.Flush()
 
@@ -305,16 +343,16 @@ func appendMap(slice, data []map[string]string) []map[string]string {
 //Connects to mysql server and reads the initial handshake,
 //then tries to login using supplied credentials.
 //The first 2 parameters are passed directly to Dial
-func Connect(netstr string, raddrstr string, username string, password string, database string) (*MySQLInstance, os.Error) {
-	var err os.Error
+func Connect(netstr string, raddrstr string, username string, password string, database string) (*MySQLInstance, error) {
+	var err error
 	dbh := new(MySQLInstance)
-        dbh.mutex = new(sync.Mutex)
+	dbh.mutex = new(sync.Mutex)
 	dbh.username = username
 	dbh.password = password
 	dbh.database = database
 	dbh.connection, err = net.Dial(netstr, raddrstr)
 	if err != nil {
-		return nil, os.ErrorString(fmt.Sprintf("Cant connect to %s\n", raddrstr))
+		return nil, errors.New(fmt.Sprintf("Cant connect to %s\n", raddrstr))
 	}
 	dbh.reader = bufio.NewReader(dbh.connection)
 	dbh.writer = bufio.NewWriter(dbh.connection)
@@ -330,7 +368,7 @@ func Connect(netstr string, raddrstr string, username string, password string, d
 	return dbh, nil
 }
 
-func (dbh *MySQLInstance) Use(arg string) (*MySQLResponse, os.Error) {
+func (dbh *MySQLInstance) Use(arg string) (*MySQLResponse, error) {
 	if dbh == nil {
 		panic("dbh object is undefined")
 	}
@@ -345,7 +383,7 @@ func (dbh *MySQLInstance) Quit() {
 	dbh.connection.Close()
 }
 
-func (dbh *MySQLInstance) Prepare(arg string) (*MySQLStatement, os.Error) {
+func (dbh *MySQLInstance) Prepare(arg string) (*MySQLStatement, error) {
 	if dbh == nil {
 		panic("dbh object is undefined")
 	}
@@ -375,7 +413,7 @@ func (rs *MySQLResponse) FetchAllRowMap() []map[string]string {
 }
 
 //Fetch next row.
-func (rs *MySQLResponse) FetchRow() (*MySQLRow, os.Error) {
+func (rs *MySQLResponse) FetchRow() (*MySQLRow, error) {
 	row, err := rs.readRowPacket(rs.mysql.reader)
 	if err != nil {
 		rs.mysql.queryDone = true
@@ -406,13 +444,13 @@ func (rs *MySQLResponse) FetchRowMap() map[string]string {
 }
 
 //Send query to server and read response. Return response object.
-func (dbh *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
+func (dbh *MySQLInstance) Query(arg string) (*MySQLResponse, error) {
 	if dbh == nil {
 		panic("dbh object is undefined")
 	}
-        // For multithreading
-        dbh.mutex.Lock()
-        defer dbh.mutex.Unlock()
+	// For multithreading
+	dbh.mutex.Lock()
+	defer dbh.mutex.Unlock()
 
 	// Terrible hack to handle unfinished Queries.
 	if dbh.queryDone == false {
@@ -428,6 +466,6 @@ func (dbh *MySQLInstance) Query(arg string) (*MySQLResponse, os.Error) {
 	return response, err
 }
 
-func (sth *MySQLStatement) Execute(a ...interface{}) (*MySQLResponse, os.Error) {
+func (sth *MySQLStatement) Execute(a ...interface{}) (*MySQLResponse, error) {
 	return sth.execute(a)
 }
