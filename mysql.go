@@ -92,7 +92,8 @@ func (mysql *MySQLInstance) readInit() error {
 	if err != nil {
 		return err
 	}
-	err = ignoreBytes(mysql.reader, 1)
+	dump := make([]byte, 99);
+	_, err = mysql.reader.Read(dump)
 	return err
 }
 

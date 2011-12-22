@@ -30,9 +30,9 @@ func encodeParamValues(a []interface{}) ([]byte, int) {
 		case int:
 			b = append(b, packString(strconv.Itoa(int(t)))...)
 		case float32:
-			b = append(b, packString(strconv.Ftoa32(float32(t), 'f', -1))...)
+			b = append(b, packString(strconv.FormatFloat(float64(t), 'f', -1, 32))...)
 		case float64:
-			b = append(b, packString(strconv.Ftoa64(float64(t), 'f', -1))...)
+			b = append(b, packString(strconv.FormatFloat(float64(t), 'f', -1, 64))...)
 		}
 	}
 	return b, len(b)

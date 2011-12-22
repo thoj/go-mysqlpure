@@ -112,8 +112,7 @@ func readFieldData(br *bufio.Reader, f *MySQLField) (string, bool, error) {
 	return "NULL", true, nil
 }
 
-func unpackDate(br *bufio.Reader) (dt *time.Time, err error) {
-	dt = new(time.Time)
+func unpackDate(br *bufio.Reader) (dt time.Time, err error) {
 	var y uint16
 	var M, d, n uint8
 	err = binary.Read(br, binary.LittleEndian, &n)
@@ -132,16 +131,10 @@ func unpackDate(br *bufio.Reader) (dt *time.Time, err error) {
 	if err != nil {
 		return
 	}
-	dt.Year = int64(y)
-	dt.Month = int(M)
-	dt.Day = int(d)
-	dt.Hour = 0
-	dt.Minute = 0
-	dt.Second = 0
+	dt = time.Date(int(y), time.Month(M), int(d), 0, 0, 0, 0, time.UTC)
 	return
 }
-func unpackTime(br *bufio.Reader) (dt *time.Time, err error) {
-	dt = new(time.Time)
+func unpackTime(br *bufio.Reader) (dt time.Time, err error) {
 	var h, m, s uint8
 	err = ignoreBytes(br, 6)
 	if err != nil {
@@ -159,16 +152,10 @@ func unpackTime(br *bufio.Reader) (dt *time.Time, err error) {
 	if err != nil {
 		return
 	}
-	dt.Year = 0
-	dt.Month = 0
-	dt.Day = 0
-	dt.Hour = int(h)
-	dt.Minute = int(m)
-	dt.Second = int(s)
+	dt = time.Date(0, 0, 0, int(h), int(m), int(s), 0, time.UTC)
 	return
 }
-func unpackDateTime(br *bufio.Reader) (dt *time.Time, err error) {
-	dt = new(time.Time)
+func unpackDateTime(br *bufio.Reader) (dt time.Time, err error) {
 	var y uint16
 	var M, d, h, m, s, n uint8
 	err = binary.Read(br, binary.LittleEndian, &n)
@@ -199,12 +186,7 @@ func unpackDateTime(br *bufio.Reader) (dt *time.Time, err error) {
 	if err != nil {
 		return
 	}
-	dt.Year = int64(y)
-	dt.Month = int(M)
-	dt.Day = int(d)
-	dt.Hour = int(h)
-	dt.Minute = int(m)
-	dt.Second = int(s)
+	dt = time.Date(int(y), time.Month(M), int(d), int(h), int(m), int(s), 0, time.UTC)
 	return
 }
 

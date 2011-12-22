@@ -284,25 +284,22 @@ func ignoreBytes(br *bufio.Reader, n uint64) error {
 func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 	ctx := sha1.New()
 	ctx.Write(password)
-	stage1 := ctx.Sum()
+	stage1 := ctx.Sum(nil)
 
 	ctx.Reset()
 	ctx.Write(stage1)
-	stage2 := ctx.Sum()
+	stage2 := ctx.Sum(nil)
 
 	ctx.Reset()
 	ctx.Write(scrambleBuffer)
 	ctx.Write(stage2)
-	result := ctx.Sum()
+	result := ctx.Sum(nil)
 
-	token := make([]byte, 21)
-	token_t := make([]byte, 21)
-	for i := 0; i < 20; i++ {
-		token[i+1] = result[i] ^ stage1[i]
+	token := make([]byte, 20)
+	for i := range token {
+		token[i] = result[i] ^ stage1[i]
 	}
-	for i := 0; i < 20; i++ {
-		token_t[i] = token[i+1] ^ result[i]
-	}
-	token[0] = 20
-	return token
+	tlen := make([]byte,1)
+	tlen[0] = byte(len(token))
+	return append(tlen, token...)
 }
