@@ -1,3 +1,12 @@
+Note
+---------------
+This driver is only here for historic purposes.
+
+*For a more fully fetured mysql driver in go use:*
+
+https://github.com/ziutek/mymysql
+
+
 Project Goal
 ----------------
 The goal of this project is to implement the MySQL wire protocol in Go,
@@ -13,12 +22,13 @@ Status
 * See example/simple.go for simple example
 * See example/prepared.go for example using server side prepared statements
 
+*For a more fully fetured mysql driver in go use:*
+
+https://github.com/ziutek/mymysql
+
 Install
 --------------
-	$ git clone git://github.com/thoj/Go-MySQL-Client-Library.git
-	$ cd Go-MySQL-Client-Library
-	$ make
-	$ make install
+	$ go get github.com/thoj/go-mysqlpure
 
 Use
 --------------
