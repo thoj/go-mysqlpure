@@ -299,7 +299,7 @@ func mysqlPassword(password []byte, scrambleBuffer []byte) []byte {
 	for i := range token {
 		token[i] = result[i] ^ stage1[i]
 	}
-	tlen := make([]byte,1)
+	tlen := make([]byte, 1)
 	tlen[0] = byte(len(token))
 	return append(tlen, token...)
 }

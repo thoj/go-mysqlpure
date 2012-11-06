@@ -1,8 +1,8 @@
 package mysql
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 func MakeDbh(t *testing.T) *MySQLInstance {
@@ -58,7 +58,6 @@ func SelectSingleRowPrepared(t *testing.T, q string, p ...interface{}) map[strin
 	dbh.Quit()
 	return row
 }
-
 
 func TestLongRun(t *testing.T) {
 	dbh := MakeDbh(t)

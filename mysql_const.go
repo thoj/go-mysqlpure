@@ -31,7 +31,6 @@ const (
 	CLIENT_MULTI_RESULTS                 = 131072 /* Enable/disable multi-results */
 )
 
-
 const (
 	MYSQL_TYPE_DECIMAL uint8 = iota
 	MYSQL_TYPE_TINY
@@ -62,37 +61,36 @@ const (
 	MYSQL_TYPE_GEOMETRY    = 255
 )
 
-
 type MySQLCommand uint32
 
 const (
 	COM_SLEEP               MySQLCommand = iota //(none, this is an internal thread state)
-	COM_QUIT                             //mysql_close
-	COM_INIT_DB                          //mysql_select_db
-	COM_QUERY                            //mysql_real_query
-	COM_FIELD_LIST                       //mysql_list_fields
-	COM_CREATE_DB                        //mysql_create_db (deprecated)
-	COM_DROP_DB                          //mysql_drop_db (deprecated)
-	COM_REFRESH                          //mysql_refresh
-	COM_SHUTDOWN                         //mysql_shutdown
-	COM_STATISTICS                       //mysql_stat
-	COM_PROCESS_INFO                     //mysql_list_processes
-	COM_CONNECT                          //(none, this is an internal thread state)
-	COM_PROCESS_KILL                     //mysql_kill
-	COM_DEBUG                            //mysql_dump_debug_info
-	COM_PING                             //mysql_ping
-	COM_TIME                             //(none, this is an internal thread state)
-	COM_DELAYED_INSERT                   //(none, this is an internal thread state)
-	COM_CHANGE_USER                      //mysql_change_user
-	COM_BINLOG_DUMP                      //sent by the slave IO thread to request a binlog
-	COM_TABLE_DUMP                       //LOAD TABLE ... FROM MASTER (deprecated)
-	COM_CONNECT_OUT                      //(none, this is an internal thread state)
-	COM_REGISTER_SLAVE                   //sent by the slave to register with the master (optional)
-	COM_STMT_PREPARE                     //mysql_stmt_prepare
-	COM_STMT_EXECUTE                     //mysql_stmt_execute
-	COM_STMT_SEND_LONG_DATA              //mysql_stmt_send_long_data
-	COM_STMT_CLOSE                       //mysql_stmt_close
-	COM_STMT_RESET                       //mysql_stmt_reset
-	COM_SET_OPTION                       //mysql_set_server_option
-	COM_STMT_FETCH                       //mysql_stmt_fetch
+	COM_QUIT                                    //mysql_close
+	COM_INIT_DB                                 //mysql_select_db
+	COM_QUERY                                   //mysql_real_query
+	COM_FIELD_LIST                              //mysql_list_fields
+	COM_CREATE_DB                               //mysql_create_db (deprecated)
+	COM_DROP_DB                                 //mysql_drop_db (deprecated)
+	COM_REFRESH                                 //mysql_refresh
+	COM_SHUTDOWN                                //mysql_shutdown
+	COM_STATISTICS                              //mysql_stat
+	COM_PROCESS_INFO                            //mysql_list_processes
+	COM_CONNECT                                 //(none, this is an internal thread state)
+	COM_PROCESS_KILL                            //mysql_kill
+	COM_DEBUG                                   //mysql_dump_debug_info
+	COM_PING                                    //mysql_ping
+	COM_TIME                                    //(none, this is an internal thread state)
+	COM_DELAYED_INSERT                          //(none, this is an internal thread state)
+	COM_CHANGE_USER                             //mysql_change_user
+	COM_BINLOG_DUMP                             //sent by the slave IO thread to request a binlog
+	COM_TABLE_DUMP                              //LOAD TABLE ... FROM MASTER (deprecated)
+	COM_CONNECT_OUT                             //(none, this is an internal thread state)
+	COM_REGISTER_SLAVE                          //sent by the slave to register with the master (optional)
+	COM_STMT_PREPARE                            //mysql_stmt_prepare
+	COM_STMT_EXECUTE                            //mysql_stmt_execute
+	COM_STMT_SEND_LONG_DATA                     //mysql_stmt_send_long_data
+	COM_STMT_CLOSE                              //mysql_stmt_close
+	COM_STMT_RESET                              //mysql_stmt_reset
+	COM_SET_OPTION                              //mysql_set_server_option
+	COM_STMT_FETCH                              //mysql_stmt_fetch
 )

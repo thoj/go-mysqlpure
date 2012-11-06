@@ -92,7 +92,7 @@ func (mysql *MySQLInstance) readInit() error {
 	if err != nil {
 		return err
 	}
-	dump := make([]byte, 99);
+	dump := make([]byte, 99)
 	_, err = mysql.reader.Read(dump)
 	return err
 }
@@ -322,6 +322,7 @@ func (dbh *MySQLInstance) sendAuth() error {
 	return err
 
 }
+
 //Stolen from http://golang.org/doc/effective_go.html#slices
 func appendMap(slice, data []map[string]string) []map[string]string {
 	l := len(slice)
