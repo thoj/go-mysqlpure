@@ -4,7 +4,7 @@ This driver is only here for historic purposes.
 
 *For a more fully fetured mysql driver in go use:*
 
-https://github.com/ziutek/mymysql
+https://github.com/go-sql-driver/mysql
 
 
 Project Goal
